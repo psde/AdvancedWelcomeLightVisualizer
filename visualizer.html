@@ -565,6 +565,12 @@
      */
     function renderDynamicSequences() {
       const container = document.getElementById("dynamicContainer");
+
+      // Cleanup old sketches to prevent memory leaks and ghost interactions
+      chartSketchesLeft.forEach(s => { if (s && s.remove) s.remove(); });
+      chartSketchesLeft = [];
+      chartSketchesRight = [];
+
       // Sticky Checkbox and Logic
       const playerDiv = document.getElementById("animationPlayer");
       const controlsDiv = playerDiv.querySelector(".controls");
@@ -604,10 +610,6 @@
 
       // Number of blocks
       let maxSeq = Math.max(sequencesLeft.length, sequencesRight.length);
-
-      // Clear arrays of sketches
-      chartSketchesLeft = [];
-      chartSketchesRight = [];
 
       for (let i = 0; i < maxSeq; i++) {
         const leftSeq = sequencesLeft[i];
@@ -779,9 +781,17 @@
           // Use clientWidth to get full width
           let cw = containerDiv.clientWidth;
           let ch = containerDiv.clientHeight || 250;
-          sketch.createCanvas(cw, ch).parent(containerDiv);
+          let canvas = sketch.createCanvas(cw, ch);
+          canvas.parent(containerDiv);
+
           w = sketch.width - 2 * margin;
           h = sketch.height - 2 * margin;
+
+          // Only start interaction if clicking directly on the canvas
+          canvas.mousePressed(() => {
+            isDragging = true;
+            handleInteraction();
+          });
         };
 
         sketch.windowResized = () => {
@@ -887,14 +897,15 @@
           }
         };
 
+        let isDragging = false;
+
         // Helper to handle both click and drag
         const handleInteraction = () => {
-          // Check if mouse is inside canvas
+          // Check if mouse is inside canvas bounds
           if (sketch.mouseX >= 0 && sketch.mouseX <= sketch.width &&
             sketch.mouseY >= 0 && sketch.mouseY <= sketch.height) {
 
             // Check if within the graph area (with a little tolerance)
-            // Allow dragging slightly outside the vertical bounds for better UX
             if (sketch.mouseX >= margin && sketch.mouseX <= margin + w) {
               let clickedTime = sketch.map(sketch.mouseX, margin, margin + w, 0, maxTime);
               // Clamp
@@ -910,7 +921,6 @@
               if (leftLight) leftLight.classList.add('focused');
               if (rightLight) rightLight.classList.add('focused');
 
-              // Optional: Prevent default processing
               return false;
             }
           }
@@ -923,14 +933,20 @@
           if (rightLight) rightLight.classList.remove('focused');
         };
 
-        // CLICK INTERACTION
-        sketch.mousePressed = handleInteraction;
-
-        // DRAG INTERACTION
-        sketch.mouseDragged = handleInteraction;
+        // DRAG INTERACTION - Only continue if we started on this canvas
+        sketch.mouseDragged = () => {
+          if (isDragging) {
+            handleInteraction();
+          }
+        };
 
         // RELEASE INTERACTION
-        sketch.mouseReleased = clearInteraction;
+        sketch.mouseReleased = () => {
+          if (isDragging) {
+            isDragging = false;
+            clearInteraction();
+          }
+        };
 
       });
     }
@@ -977,8 +993,6 @@
       chartSketchesRight[seqIndex] = newSketch;
     }
 
-    window.ondevicemotion = null;
-    window.ondeviceorientation = null;
     // ============================================================================
     // Animation Player Logic
     // ============================================================================
