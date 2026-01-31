@@ -286,6 +286,14 @@
     <div class="controls">
       <button onclick="togglePlay()">Play/Pause</button>
       <button onclick="stopAnimation()">Stop</button>
+
+      <label for="speedSelect" style="margin-left: 10px;">Speed:</label>
+      <select id="speedSelect" onchange="changeSpeed(this.value)">
+        <option value="0.5">0.5x</option>
+        <option value="1" selected>1.0x</option>
+        <option value="1.5">1.5x</option>
+      </select>
+
       <span class="time-display" id="timeDisplay">0 ms</span>
       <input type="range" id="seekSlider" min="0" max="10000" value="0" step="10" oninput="seekAnimation(this.value)">
       <span class="time-display" id="totalTimeDisplay">0 ms</span>
@@ -297,7 +305,9 @@
       </div>
       <div class="light-group">
         <h4>Right</h4>
-        <div class="lights-grid" id="rightLights"></div>
+
+        <!-- Added style="flex-direction: row-reverse;" for mirroring -->
+        <div class="lights-grid" id="rightLights" style="flex-direction: row-reverse;"></div>
       </div>
     </div>
   </div>
@@ -762,6 +772,27 @@
             }
           }
           sketch.endShape();
+
+          // Current Position Indicator
+          if (typeof currentAnimTime !== 'undefined') {
+            // Draw if visible (xPos within reasonable bounds, though users might want to see it fly by)
+            // We clamp it visually to the graph area? No, let's just let it be.
+            // But we should probably clip drawing to the rect area if we wanted to be super clean,
+            // but standard p5 lines over the border are okay for a basic visualizer.
+
+            let xPos = sketch.map(currentAnimTime, 0, maxTime, margin, margin + w);
+
+            if (xPos >= margin && xPos <= margin + w) {
+              sketch.stroke(50);
+              sketch.strokeWeight(2);
+              sketch.line(xPos, margin, xPos, margin + h);
+
+              // Optional: Small triangle/marker at the bottom
+              sketch.fill(50);
+              sketch.noStroke();
+              sketch.triangle(xPos, margin + h, xPos - 5, margin + h + 10, xPos + 5, margin + h + 10);
+            }
+          }
         };
       });
     }
@@ -815,9 +846,10 @@
     // ============================================================================
     let animationId = null;
     let isPlaying = false;
-    let animationStartTime = 0;
+    let lastFrameTime = 0;
     let currentAnimTime = 0;
     let totalDuration = 0;
+    let playbackSpeed = 1.0;
 
     function rebuildAnimationPlayer() {
       const leftContainer = document.getElementById("leftLights");
@@ -868,6 +900,10 @@
       return t;
     }
 
+    function changeSpeed(val) {
+      playbackSpeed = parseFloat(val);
+    }
+
     function togglePlay() {
       if (isPlaying) {
         pauseAnimation();
@@ -884,7 +920,7 @@
       }
 
       isPlaying = true;
-      animationStartTime = performance.now() - currentAnimTime;
+      lastFrameTime = performance.now();
       animationLoop();
     }
 
@@ -901,24 +937,25 @@
     }
 
     function seekAnimation(val) {
-      // pause dragging if needed, but usually fine to just update time
-      // if (isPlaying) pauseAnimation(); 
-      currentAnimTime = parseInt(val);
+      currentAnimTime = parseFloat(val);
       if (!isPlaying) {
         updateVisuals(currentAnimTime);
         updateControls(currentAnimTime);
       } else {
-        // If playing, we just shift the start time so the loop continues from new time
-        animationStartTime = performance.now() - currentAnimTime;
-        updateVisuals(currentAnimTime);
-        updateControls(currentAnimTime);
+        // If playing, update time logic needs a reset of lastFrameTime 
+        // so we don't jump. But actually we use Delta, so we just
+        // set currentAnimTime and ensure lastFrameTime is 'now' to avoid huge delta
+        lastFrameTime = performance.now();
       }
     }
 
     function animationLoop() {
       if (!isPlaying) return;
       const now = performance.now();
-      currentAnimTime = now - animationStartTime;
+      const delta = now - lastFrameTime;
+      lastFrameTime = now;
+
+      currentAnimTime += delta * playbackSpeed;
 
       if (currentAnimTime >= totalDuration) {
         currentAnimTime = totalDuration;
