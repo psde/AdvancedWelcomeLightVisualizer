@@ -134,6 +134,20 @@
       margin-bottom: 0;
     }
 
+    .mini-copy-btn {
+      padding: 0px 6px !important;
+      font-size: 11px !important;
+      background-color: #6c757d !important;
+      margin: 0 !important;
+      height: 18px;
+      line-height: 18px;
+      vertical-align: middle;
+    }
+
+    .mini-copy-btn:hover {
+      background-color: #5a6268 !important;
+    }
+
     .chartCanvas {
       margin: 5px 0;
       border: 1px solid #ccc;
@@ -296,6 +310,155 @@
       min-width: 200px;
       /* Ensure it has some base width */
     }
+
+    /* Visual Editor Styles */
+    .editor-toggle {
+      display: flex;
+      gap: 0;
+      margin-bottom: 8px;
+    }
+
+    .editor-toggle button {
+      padding: 4px 12px;
+      font-size: 12px;
+      border-radius: 0;
+      margin: 0;
+      background-color: #ddd;
+      color: #333;
+      border: 1px solid #ccc;
+    }
+
+    .editor-toggle button:first-child {
+      border-radius: 4px 0 0 4px;
+    }
+
+    .editor-toggle button:last-child {
+      border-radius: 0 4px 4px 0;
+    }
+
+    .editor-toggle button.active {
+      background-color: #007bff;
+      color: white;
+      border-color: #007bff;
+    }
+
+    .visual-editor {
+      background-color: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .step-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      background-color: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      margin-bottom: 6px;
+    }
+
+    .step-row:last-of-type {
+      margin-bottom: 0;
+    }
+
+    .step-label {
+      font-weight: bold;
+      font-size: 12px;
+      min-width: 50px;
+      color: #555;
+    }
+
+    .step-field {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+      min-width: 140px;
+    }
+
+    .step-field label {
+      font-size: 11px;
+      color: #666;
+      margin: 0;
+      min-width: 55px;
+    }
+
+    .step-field input[type="range"] {
+      flex: 1;
+      min-width: 60px;
+      height: 6px;
+    }
+
+    .step-field .value-display {
+      font-size: 11px;
+      font-family: monospace;
+      margin-left: -2px;
+    }
+
+    .step-field input[type="number"] {
+      width: 55px;
+      padding: 2px 4px;
+      font-size: 11px;
+      font-family: monospace;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      text-align: right;
+    }
+
+    .step-field input[type="number"]:focus {
+      outline: none;
+      border-color: #007bff;
+    }
+
+    .step-remove {
+      background-color: #dc3545;
+      padding: 2px 8px;
+      font-size: 11px;
+    }
+
+    .step-remove:hover {
+      background-color: #c82333;
+    }
+
+    .add-step-btn {
+      width: 100%;
+      margin-top: 8px;
+      background-color: #28a745;
+      font-size: 12px;
+    }
+
+    .add-step-btn:hover {
+      background-color: #218838;
+    }
+
+    /* Overflow and Warning Styles */
+    .overflow-error {
+      color: #dc3545 !important;
+      font-weight: bold;
+    }
+
+    textarea.overflow-error {
+      border: 2px solid #dc3545 !important;
+      background-color: #fff8f8 !important;
+    }
+
+    .byte-counter-info {
+      font-size: 11px;
+      font-weight: bold;
+      color: #333;
+      /* Darker for better visibility */
+      background: #eee;
+      padding: 1px 4px;
+      border-radius: 3px;
+      margin-left: 10px;
+      border: 1px solid #ccc;
+    }
   </style>
 </head>
 
@@ -321,15 +484,17 @@
     <!-- Group 1: FLM2 left [0x43] -->
     <div class="group-container">
       <h3>FLM2 Left [0x43]</h3>
-      <label for="leftStaging1">Staging1_Data (max 252 Byte):</label>
+      <label for="leftStaging1" id="label_leftStaging1">Staging1_Data (max 252 Byte):<span class="byte-counter-info"
+          id="counter_leftStaging1"></span></label>
       <div class="input-row">
         <input type="text" id="leftStaging1" placeholder="252 Byte, z.B. 00, 01, ..." />
         <button class="copy-btn" title="Copy to Clipboard" onclick="copyToClipboard('leftStaging1')">⧉</button>
         <button class="paste-btn" title="Paste from Clipboard" onclick="pasteFromClipboard('leftStaging1')">⤶</button>
       </div>
-      <label for="leftStaging2">Staging2_Data (max 252 Byte):</label>
+      <label for="leftStaging2" id="label_leftStaging2">Staging2_Data (max 168 Byte):<span class="byte-counter-info"
+          id="counter_leftStaging2"></span></label>
       <div class="input-row">
-        <input type="text" id="leftStaging2" placeholder="252 Byte, z.B. 00, 01, ..." />
+        <input type="text" id="leftStaging2" placeholder="168 Byte, z.B. 00, 01, ..." />
         <button class="copy-btn" title="Copy to Clipboard" onclick="copyToClipboard('leftStaging2')">⧉</button>
         <button class="paste-btn" title="Paste from Clipboard" onclick="pasteFromClipboard('leftStaging2')">⤶</button>
       </div>
@@ -338,15 +503,17 @@
     <!-- Group 2: FLM2 right [0x44] -->
     <div class="group-container">
       <h3>FLM2 Right [0x44]</h3>
-      <label for="rightStaging1">Staging1_Data (max 252 Byte):</label>
+      <label for="rightStaging1" id="label_rightStaging1">Staging1_Data (max 252 Byte):<span class="byte-counter-info"
+          id="counter_rightStaging1"></span></label>
       <div class="input-row">
         <input type="text" id="rightStaging1" placeholder="252 Byte, z.B. 00, 01, ..." />
         <button class="copy-btn" title="Copy to Clipboard" onclick="copyToClipboard('rightStaging1')">⧉</button>
         <button class="paste-btn" title="Paste from Clipboard" onclick="pasteFromClipboard('rightStaging1')">⤶</button>
       </div>
-      <label for="rightStaging2">Staging2_Data (max 252 Byte):</label>
+      <label for="rightStaging2" id="label_rightStaging2">Staging2_Data (max 168 Byte):<span class="byte-counter-info"
+          id="counter_rightStaging2"></span></label>
       <div class="input-row">
-        <input type="text" id="rightStaging2" placeholder="252 Byte, z.B. 00, 01, ..." />
+        <input type="text" id="rightStaging2" placeholder="168 Byte, z.B. 00, 01, ..." />
         <button class="copy-btn" title="Copy to Clipboard" onclick="copyToClipboard('rightStaging2')">⧉</button>
         <button class="paste-btn" title="Paste from Clipboard" onclick="pasteFromClipboard('rightStaging2')">⤶</button>
       </div>
@@ -417,6 +584,36 @@
       }
     }
 
+    function updateUsageUI(side, totalLen) {
+      const isLeft = (side === 'left');
+      const max1 = isLeft ? MAX_LEFT1 : MAX_RIGHT1;
+      const max2 = isLeft ? MAX_LEFT2 : MAX_RIGHT2;
+      const totalMax = max1 + max2;
+      const overMax = totalLen > totalMax;
+
+      const c1 = document.getElementById(`counter_${side}Staging1`);
+      const c2 = document.getElementById(`counter_${side}Staging2`);
+      const l1 = document.getElementById(`label_${side}Staging1`);
+      const l2 = document.getElementById(`label_${side}Staging2`);
+      const i1 = document.getElementById(`${side}Staging1`);
+      const i2 = document.getElementById(`${side}Staging2`);
+
+      if (c1) c1.textContent = `(${Math.min(totalLen, max1)} / ${max1} Bytes)`;
+      if (c2) c2.textContent = `(${Math.max(0, Math.min(totalLen - max1, max2))} / ${max2} Bytes)`;
+
+      if (overMax) {
+        if (l1) l1.classList.add("overflow-error");
+        if (l2) l2.classList.add("overflow-error");
+        if (i1) i1.classList.add("overflow-error");
+        if (i2) i2.classList.add("overflow-error");
+      } else {
+        if (l1) l1.classList.remove("overflow-error");
+        if (l2) l2.classList.remove("overflow-error");
+        if (i1) i1.classList.remove("overflow-error");
+        if (i2) i2.classList.remove("overflow-error");
+      }
+    }
+
     // ============================================================================
     // Copy to Clipboard function
     // ============================================================================
@@ -465,7 +662,288 @@
     let chartSketchesLeft = [];
     let chartSketchesRight = [];
 
+    // Edit mode state: 'hex' or 'visual' per sequence
+    let editModes = { left: {}, right: {} };
+
     // ============================================================================
+    // Visual Editor Functions
+    // ============================================================================
+    function toggleEditMode(side, seqIndex, mode) {
+      editModes[side][seqIndex] = mode;
+      renderSequenceEditor(side, seqIndex);
+    }
+
+    function renderSequenceEditor(side, seqIndex) {
+      const container = document.getElementById(`editor_${side}_${seqIndex}`);
+      if (!container) return;
+
+      const mode = editModes[side][seqIndex] || 'hex';
+      const seq = (side === 'left') ? sequencesLeft[seqIndex] : sequencesRight[seqIndex];
+
+      // Update toggle buttons
+      const toggleDiv = container.querySelector('.editor-toggle');
+      if (toggleDiv) {
+        toggleDiv.querySelectorAll('button').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.mode === mode);
+        });
+      }
+
+      // Get or create content container
+      let contentDiv = container.querySelector('.editor-content');
+      if (!contentDiv) {
+        contentDiv = document.createElement('div');
+        contentDiv.className = 'editor-content';
+        container.appendChild(contentDiv);
+      }
+
+      if (mode === 'hex') {
+        renderHexEditor(contentDiv, side, seqIndex, seq);
+      } else {
+        renderVisualEditor(contentDiv, side, seqIndex, seq);
+      }
+    }
+
+    function renderHexEditor(container, side, seqIndex, seq) {
+      container.innerHTML = '';
+      const ta = document.createElement('textarea');
+      ta.value = seq ? sequenceToString(seq) : '';
+      ta.style.width = '100%';
+      ta.style.height = '60px';
+      ta.style.fontFamily = 'monospace';
+      ta.style.fontSize = '11px';
+      ta.oninput = (e) => {
+        if (side === 'left') {
+          sequencesLeft[seqIndex] = stringToSequence(e.target.value);
+          reAssembleLeftBytes();
+        } else {
+          sequencesRight[seqIndex] = stringToSequence(e.target.value);
+          reAssembleRightBytes();
+        }
+        updateSingleDiagram(side, seqIndex);
+        updateVisuals(currentAnimTime);
+      };
+      container.appendChild(ta);
+    }
+
+    function renderVisualEditor(container, side, seqIndex, seq) {
+      container.innerHTML = '';
+
+      if (!seq || seq.identifier === 'RAW') {
+        container.innerHTML = '<p style="color:#999;font-size:12px;">RAW data - use hex mode to edit</p>';
+        return;
+      }
+
+      const editorDiv = document.createElement('div');
+      editorDiv.className = 'visual-editor';
+
+      // Parse steps from seq.data (pairs of duration, brightness)
+      const steps = [];
+      for (let i = 0; i < seq.data.length; i += 2) {
+        const durHex = parseInt(seq.data[i], 16) || 0;
+        const briHex = parseInt(seq.data[i + 1], 16) || 0;
+        steps.push({ duration: durHex, brightness: Math.min(briHex, 100) });
+      }
+
+      steps.forEach((step, stepIdx) => {
+        const row = document.createElement('div');
+        row.className = 'step-row';
+
+        // Step label
+        const label = document.createElement('span');
+        label.className = 'step-label';
+        label.textContent = `#${stepIdx + 1}`;
+        row.appendChild(label);
+
+        // Duration field - with number input
+        const durField = document.createElement('div');
+        durField.className = 'step-field';
+        durField.innerHTML = `
+          <label>Duration:</label>
+          <input type="range" min="0" max="255" value="${step.duration}" 
+                 data-side="${side}" data-seq="${seqIndex}" data-step="${stepIdx}" data-type="duration">
+          <input type="number" min="0" max="2550" step="10" value="${step.duration * 10}"
+                 data-side="${side}" data-seq="${seqIndex}" data-step="${stepIdx}" data-type="duration">
+          <span class="value-display">ms</span>
+        `;
+        row.appendChild(durField);
+
+        // Brightness field - with number input
+        const briField = document.createElement('div');
+        briField.className = 'step-field';
+        briField.innerHTML = `
+          <label>Brightness:</label>
+          <input type="range" min="0" max="100" value="${step.brightness}"
+                 data-side="${side}" data-seq="${seqIndex}" data-step="${stepIdx}" data-type="brightness">
+          <input type="number" min="0" max="100" value="${step.brightness}"
+                 data-side="${side}" data-seq="${seqIndex}" data-step="${stepIdx}" data-type="brightness">
+          <span class="value-display">%</span>
+        `;
+        row.appendChild(briField);
+
+        // Remove button
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'step-remove';
+        removeBtn.textContent = '✕';
+        removeBtn.onclick = () => removeStep(side, seqIndex, stepIdx);
+        row.appendChild(removeBtn);
+
+        editorDiv.appendChild(row);
+      });
+
+      // Add event listeners for sliders - sync to number input
+      editorDiv.querySelectorAll('input[type="range"]').forEach(slider => {
+        slider.oninput = (e) => {
+          const { side: s, seq: si, step: sti, type } = e.target.dataset;
+          const val = parseInt(e.target.value);
+
+          // Update number input
+          const numInput = e.target.nextElementSibling;
+          if (type === 'duration') {
+            numInput.value = val * 10;
+          } else {
+            numInput.value = val;
+          }
+
+          // Update sequence data
+          updateStepValue(s, parseInt(si), parseInt(sti), type, val);
+        };
+      });
+
+      // Add event listeners for number inputs - sync to slider
+      editorDiv.querySelectorAll('input[type="number"]').forEach(numInput => {
+        numInput.oninput = (e) => {
+          const { side: s, seq: si, step: sti, type } = e.target.dataset;
+          let inputVal = parseInt(e.target.value) || 0;
+
+          // Clamp and convert to internal value
+          let val;
+          if (type === 'duration') {
+            inputVal = Math.max(0, Math.min(2550, inputVal));
+            val = Math.round(inputVal / 10);
+          } else {
+            val = Math.max(0, Math.min(100, inputVal));
+          }
+
+          // Update slider
+          const slider = e.target.previousElementSibling;
+          slider.value = val;
+
+          // Update sequence data
+          updateStepValue(s, parseInt(si), parseInt(sti), type, val);
+        };
+      });
+
+      // Add step button
+      const addBtn = document.createElement('button');
+      addBtn.className = 'add-step-btn';
+      addBtn.textContent = '+ Add Step';
+      addBtn.onclick = () => addStep(side, seqIndex);
+      editorDiv.appendChild(addBtn);
+
+      container.appendChild(editorDiv);
+    }
+
+    function copySequence(fromSide, seqIndex) {
+      const toSide = fromSide === 'left' ? 'right' : 'left';
+      const fromSeq = fromSide === 'left' ? sequencesLeft[seqIndex] : sequencesRight[seqIndex];
+
+      if (!fromSeq) return;
+
+      // Deep copy the sequence
+      const copiedSeq = {
+        identifier: fromSeq.identifier,
+        lengthVal: fromSeq.lengthVal,
+        data: [...fromSeq.data]
+      };
+
+      // Assign to target side
+      if (toSide === 'left') {
+        sequencesLeft[seqIndex] = copiedSeq;
+        reAssembleLeftBytes();
+      } else {
+        sequencesRight[seqIndex] = copiedSeq;
+        reAssembleRightBytes();
+      }
+
+      // Re-render the target editor and update diagram
+      renderSequenceEditor(toSide, seqIndex);
+      updateSingleDiagram(toSide, seqIndex);
+      updateVisuals(currentAnimTime);
+    }
+
+    function updateStepValue(side, seqIndex, stepIndex, type, value) {
+      const seq = (side === 'left') ? sequencesLeft[seqIndex] : sequencesRight[seqIndex];
+      if (!seq || seq.identifier === 'RAW') return;
+
+      const dataIdx = stepIndex * 2 + (type === 'duration' ? 0 : 1);
+      if (dataIdx < seq.data.length) {
+        seq.data[dataIdx] = value.toString(16).toUpperCase().padStart(2, '0');
+
+        // Recalculate length if needed (lengthVal = number of step pairs)
+        seq.lengthVal = Math.floor(seq.data.length / 2);
+
+        if (side === 'left') {
+          reAssembleLeftBytes();
+        } else {
+          reAssembleRightBytes();
+        }
+        updateSingleDiagram(side, seqIndex);
+        updateVisuals(currentAnimTime);
+      }
+    }
+
+    function addStep(side, seqIndex) {
+      const seq = (side === 'left') ? sequencesLeft[seqIndex] : sequencesRight[seqIndex];
+      if (!seq || seq.identifier === 'RAW') return;
+
+      // Add default step: 10 (100ms), 00 (0%)
+      seq.data.push('0A', '00');
+      seq.lengthVal = Math.floor(seq.data.length / 2);
+
+      if (side === 'left') {
+        reAssembleLeftBytes();
+      } else {
+        reAssembleRightBytes();
+      }
+      updateSingleDiagram(side, seqIndex);
+      updateVisuals(currentAnimTime);
+      renderSequenceEditor(side, seqIndex);
+    }
+
+    function removeStep(side, seqIndex, stepIndex) {
+      const seq = (side === 'left') ? sequencesLeft[seqIndex] : sequencesRight[seqIndex];
+      if (!seq || seq.identifier === 'RAW') return;
+
+      // Remove 2 bytes for this step
+      const dataIdx = stepIndex * 2;
+      if (dataIdx < seq.data.length) {
+        seq.data.splice(dataIdx, 2);
+        seq.lengthVal = Math.floor(seq.data.length / 2);
+
+        if (side === 'left') {
+          reAssembleLeftBytes();
+        } else {
+          reAssembleRightBytes();
+        }
+        updateSingleDiagram(side, seqIndex);
+        updateVisuals(currentAnimTime);
+        renderSequenceEditor(side, seqIndex);
+      }
+    }
+
+    // ============================================================================
+    function calculateSeqsSize(seqs) {
+      let total = 0;
+      for (let s of seqs) {
+        if (s.identifier === "RAW") {
+          total += s.data.length;
+        } else {
+          total += 3 + s.data.length; // Identifier (1) + Length (2)
+        }
+      }
+      return total;
+    }
+
     // 2) Main work
     // ============================================================================
     function buildDynamicFields() {
@@ -491,7 +969,11 @@
       sequencesLeft = parseAllSequencesFromBytes(left1Bytes, left2Bytes);
       sequencesRight = parseAllSequencesFromBytes(right1Bytes, right2Bytes);
 
-      // 5) Create dynamic fields
+      // 5) Update UI counters (excluding padding)
+      updateUsageUI('left', calculateSeqsSize(sequencesLeft));
+      updateUsageUI('right', calculateSeqsSize(sequencesRight));
+
+      // 6) Create dynamic fields
       renderDynamicSequences();
       rebuildAnimationPlayer();
     }
@@ -584,9 +1066,11 @@
         seqs.push({ identifier, lengthVal, data });
       }
 
-      // leftover => RAW
+      // leftover => RAW if not pure padding
       let leftover = combined.slice(idx);
-      if (leftover.length > 0) {
+      // Only add as RAW if there are non-zero bytes in the remnant
+      const hasContent = leftover.some(b => b !== "00" && b !== "0");
+      if (hasContent) {
         seqs.push({ identifier: "RAW", lengthVal: leftover.length, data: leftover });
       }
       return seqs;
@@ -654,19 +1138,25 @@
         const leftSub = document.createElement("div");
         leftSub.className = "seq-subblock";
         let leftH4 = document.createElement("h4");
-        leftH4.textContent = `Seq Left #${i + 1}`;
+        leftH4.style.display = "flex";
+        leftH4.style.justifyContent = "space-between";
+        leftH4.style.alignItems = "center";
+        leftH4.innerHTML = `<span>Seq Left #${i + 1}</span> <button class="mini-copy-btn" onclick="copySequence('left', ${i})" title="Copy Left → Right">→</button>`;
         leftSub.appendChild(leftH4);
 
-        // Textarea
-        let leftTA = document.createElement("textarea");
-        leftTA.value = leftSeq ? sequenceToString(leftSeq) : "";
-        leftTA.oninput = (e) => {
-          sequencesLeft[i] = stringToSequence(e.target.value);
-          reAssembleLeftBytes();
-          updateSingleDiagram("left", i);
-          updateVisuals(currentAnimTime); // Live update
-        };
-        leftSub.appendChild(leftTA);
+        // Editor container with toggle
+        const leftEditor = document.createElement("div");
+        leftEditor.id = `editor_left_${i}`;
+
+        // Toggle buttons
+        const leftToggle = document.createElement("div");
+        leftToggle.className = "editor-toggle";
+        leftToggle.innerHTML = `
+          <button data-mode="visual" onclick="toggleEditMode('left', ${i}, 'visual')">📝 Visual</button>
+          <button data-mode="hex" class="active" onclick="toggleEditMode('left', ${i}, 'hex')">&lt;&gt; Hex</button>
+        `;
+        leftEditor.appendChild(leftToggle);
+        leftSub.appendChild(leftEditor);
 
         seqBlock.appendChild(leftSub);
 
@@ -674,19 +1164,26 @@
         const rightSub = document.createElement("div");
         rightSub.className = "seq-subblock";
         let rightH4 = document.createElement("h4");
-        rightH4.textContent = `Seq Right #${i + 1}`;
+        rightH4.style.display = "flex";
+        rightH4.style.justifyContent = "space-between";
+        rightH4.style.alignItems = "center";
+        rightH4.style.flexDirection = "row-reverse"; // Arrow on the left for right side
+        rightH4.innerHTML = `<span>Seq Right #${i + 1}</span> <button class="mini-copy-btn" onclick="copySequence('right', ${i})" title="Copy Right → Left">←</button>`;
         rightSub.appendChild(rightH4);
 
-        // Textarea
-        let rightTA = document.createElement("textarea");
-        rightTA.value = rightSeq ? sequenceToString(rightSeq) : "";
-        rightTA.oninput = (e) => {
-          sequencesRight[i] = stringToSequence(e.target.value);
-          reAssembleRightBytes();
-          updateSingleDiagram("right", i);
-          updateVisuals(currentAnimTime); // Live update
-        };
-        rightSub.appendChild(rightTA);
+        // Editor container with toggle
+        const rightEditor = document.createElement("div");
+        rightEditor.id = `editor_right_${i}`;
+
+        // Toggle buttons
+        const rightToggle = document.createElement("div");
+        rightToggle.className = "editor-toggle";
+        rightToggle.innerHTML = `
+          <button data-mode="visual" onclick="toggleEditMode('right', ${i}, 'visual')">📝 Visual</button>
+          <button data-mode="hex" class="active" onclick="toggleEditMode('right', ${i}, 'hex')">&lt;&gt; Hex</button>
+        `;
+        rightEditor.appendChild(rightToggle);
+        rightSub.appendChild(rightEditor);
 
         seqBlock.appendChild(rightSub);
 
@@ -701,6 +1198,12 @@
         seqBlock.appendChild(chartDiv);
 
         container.appendChild(seqBlock);
+
+        // Initialize editors with default mode (hex)
+        editModes.left[i] = editModes.left[i] || 'hex';
+        editModes.right[i] = editModes.right[i] || 'hex';
+        renderSequenceEditor('left', i);
+        renderSequenceEditor('right', i);
 
         // Initial p5 Sketch
         let s = createSingleChart(i, chartDiv);
@@ -759,17 +1262,21 @@
           combined.push(seq.identifier, hl.slice(0, 2), hl.slice(2, 4), ...seq.data);
         }
       }
+
+      const totalLen = combined.length;
+      updateUsageUI('left', totalLen);
+
       left1Bytes = combined.slice(0, MAX_LEFT1);
       let leftover = combined.slice(MAX_LEFT1);
       left2Bytes = leftover.slice(0, MAX_LEFT2);
-      let leftover2 = leftover.slice(MAX_LEFT2);
-      if (leftover2.length > 0) {
-        console.warn("Left side data truncated!");
-      }
+
       while (left1Bytes.length < MAX_LEFT1) left1Bytes.push("00");
       while (left2Bytes.length < MAX_LEFT2) left2Bytes.push("00");
-      document.getElementById("leftStaging1").value = buildByteString(left1Bytes);
-      document.getElementById("leftStaging2").value = buildByteString(left2Bytes);
+
+      const i1 = document.getElementById("leftStaging1");
+      const i2 = document.getElementById("leftStaging2");
+      if (i1) i1.value = buildByteString(left1Bytes);
+      if (i2) i2.value = buildByteString(left2Bytes);
     }
 
     /**
@@ -786,17 +1293,21 @@
           combined.push(seq.identifier, hl.slice(0, 2), hl.slice(2, 4), ...seq.data);
         }
       }
+
+      const totalLen = combined.length;
+      updateUsageUI('right', totalLen);
+
       right1Bytes = combined.slice(0, MAX_RIGHT1);
       let leftover = combined.slice(MAX_RIGHT1);
       right2Bytes = leftover.slice(0, MAX_RIGHT2);
-      let leftover2 = leftover.slice(MAX_RIGHT2);
-      if (leftover2.length > 0) {
-        console.warn("Right side data truncated!");
-      }
+
       while (right1Bytes.length < MAX_RIGHT1) right1Bytes.push("00");
       while (right2Bytes.length < MAX_RIGHT2) right2Bytes.push("00");
-      document.getElementById("rightStaging1").value = buildByteString(right1Bytes);
-      document.getElementById("rightStaging2").value = buildByteString(right2Bytes);
+
+      const i1 = document.getElementById("rightStaging1");
+      const i2 = document.getElementById("rightStaging2");
+      if (i1) i1.value = buildByteString(right1Bytes);
+      if (i2) i2.value = buildByteString(right2Bytes);
     }
 
     /**
