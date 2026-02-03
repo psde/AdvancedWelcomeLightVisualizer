@@ -43,7 +43,7 @@ The data should be the same for the left and right control units, as the animati
 
 ### Installation
 
-There´s nothing to install, just download the .html file.
+There´s nothing to install, just download the `index.html` file.
 
 ### Usage
 

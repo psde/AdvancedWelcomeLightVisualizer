@@ -6,6 +6,7 @@
   <title>Welcome Light Visualizer v0.1</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
   <script src="templates.js"></script>
+  <script src="vehicles.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -270,6 +271,13 @@
       z-index: 10;
     }
 
+    /* SVG elements focused state */
+    svg .focused {
+      stroke: #ff0000 !important;
+      stroke-width: 4px !important;
+      filter: drop-shadow(0 0 8px rgba(255, 0, 0, 0.8)) !important;
+    }
+
     .light-bulb::after {
       content: attr(data-index);
       position: absolute;
@@ -294,11 +302,19 @@
 <body>
   <h2>Advanced Welcome Light Visualizer</h2>
 
-  <div style="margin-bottom: 20px; text-align: center;">
-    <label for="templateSelect" style="display: inline-block; margin-right: 10px;">Load Template:</label>
-    <select id="templateSelect" onchange="loadSelectedTemplate()">
-      <option value="">-- Select a Template --</option>
-    </select>
+  <div style="margin-bottom: 20px; text-align: center; display: flex; justify-content: center; gap: 20px;">
+    <div>
+      <label for="templateSelect" style="display: inline-block; margin-right: 10px;">Load Template:</label>
+      <select id="templateSelect" onchange="loadSelectedTemplate()">
+        <option value="">-- Select a Template --</option>
+      </select>
+    </div>
+    <div>
+      <label for="vehicleSelect" style="display: inline-block; margin-right: 10px;">Vehicle Model:</label>
+      <select id="vehicleSelect" onchange="buildDynamicFields()">
+        <!-- Populated dynamically -->
+      </select>
+    </div>
   </div>
 
   <div class="main-section">
@@ -494,6 +510,22 @@
         const option = document.createElement('option');
         option.value = key;
         option.textContent = key;
+        select.appendChild(option);
+      }
+    }
+
+    function initVehicles() {
+      const select = document.getElementById('vehicleSelect');
+      if (typeof VEHICLE_CONFIGS === 'undefined') {
+        console.warn('VEHICLE_CONFIGS not found. Make sure vehicles.js is loaded.');
+        return;
+      }
+
+      select.innerHTML = "";
+      for (const key of Object.keys(VEHICLE_CONFIGS)) {
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = VEHICLE_CONFIGS[key].name || key;
         select.appendChild(option);
       }
     }
@@ -1009,6 +1041,31 @@
       leftContainer.innerHTML = "";
       rightContainer.innerHTML = "";
 
+      const vehicleKey = document.getElementById("vehicleSelect").value;
+      const config = VEHICLE_CONFIGS[vehicleKey] || VEHICLE_CONFIGS["generic"];
+
+      if (config.type === "image") {
+        setupImageVisualization(leftContainer, rightContainer, config);
+      } else {
+        setupGridVisualization(leftContainer, rightContainer);
+      }
+
+      // Calculate total duration (max of all sequences)
+      totalDuration = 0;
+      [...sequencesLeft, ...sequencesRight].forEach(seq => {
+        const dur = getSequenceDuration(seq);
+        if (dur > totalDuration) totalDuration = dur;
+      });
+
+      const slider = document.getElementById("seekSlider");
+      slider.max = totalDuration;
+      slider.value = 0;
+      document.getElementById("totalTimeDisplay").textContent = `${totalDuration} ms`;
+
+      stopAnimation();
+    }
+
+    function setupGridVisualization(leftContainer, rightContainer) {
       // Create lights for Left
       sequencesLeft.forEach((seq, idx) => {
         const div = document.createElement("div");
@@ -1026,20 +1083,54 @@
         div.id = `right_light_${idx}`;
         rightContainer.appendChild(div);
       });
+    }
 
-      // Calculate total duration (max of all sequences)
-      totalDuration = 0;
-      [...sequencesLeft, ...sequencesRight].forEach(seq => {
-        const dur = getSequenceDuration(seq);
-        if (dur > totalDuration) totalDuration = dur;
-      });
+    function setupImageVisualization(leftContainer, rightContainer, config) {
+      const createSVG = (side) => {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", config.viewBox);
+        svg.style.width = "450px"; // Slightly larger
+        svg.style.height = "auto";
+        svg.style.backgroundImage = `url('${config.image}')`;
+        svg.style.backgroundSize = "cover";
+        svg.style.borderRadius = "8px";
+        svg.style.border = "1px solid #333";
 
-      const slider = document.getElementById("seekSlider");
-      slider.max = totalDuration;
-      slider.value = 0;
-      document.getElementById("totalTimeDisplay").textContent = `${totalDuration} ms`;
+        // Mirroring logic based on baseSide
+        const baseSide = config.baseSide || "left";
+        if (side !== baseSide) {
+          svg.style.transform = "scaleX(-1)"; // Mirror the side that is not the base side
+        }
 
-      stopAnimation();
+        config.channels.forEach((channel, idx) => {
+          let el;
+          if (channel.type === "path") {
+            el = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            el.setAttribute("d", channel.d);
+          } else if (channel.type === "circle") {
+            el = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            el.setAttribute("cx", channel.cx);
+            el.setAttribute("cy", channel.cy);
+            el.setAttribute("r", channel.r);
+          }
+          if (el) {
+            el.id = `${side}_light_${idx}`;
+            el.setAttribute("fill", "transparent");
+            el.setAttribute("stroke", "transparent");
+            el.setAttribute("stroke-width", "2");
+            el.style.transition = "all 0.1s ease";
+            // Add title for hover info
+            const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+            title.textContent = channel.label || `Channel ${idx + 1}`;
+            el.appendChild(title);
+            svg.appendChild(el);
+          }
+        });
+        return svg;
+      };
+
+      leftContainer.appendChild(createSVG("left"));
+      rightContainer.appendChild(createSVG("right"));
     }
 
     function getSequenceDuration(seq) {
@@ -1149,26 +1240,38 @@
     }
 
     function applyBrightness(element, brightness) {
-      // Brightness 0-100
-      // Visual: scale color from black to white/blueish (LED)
-      // Let's use a nice LED Cyan/White color: #E0F7FA (224, 247, 250)
-      // Base is #000
-
-      // Simple grayscale for now as requested "white" usually, but BMW welcome lights are often distinctive.
-      // Let's stick to simple white/gray scale.
+      const isSVG = element instanceof SVGElement;
       const val = Math.round((brightness / 100) * 255);
 
-      // For visibility on dark bg:
-      // Background color
-      element.style.backgroundColor = `rgb(${val}, ${val}, ${val})`;
+      if (isSVG) {
+        // SVG styling
+        if (brightness > 0) {
+          const color = `rgba(255, 255, 255, ${brightness / 100})`;
+          element.setAttribute("fill", color);
+          // Only set stroke if it's not focused, or handle focused in CSS with !important
+          element.setAttribute("stroke", color);
 
-      // Glow effect
-      if (brightness > 0) {
-        element.style.boxShadow = `0 0 ${brightness / 3}px rgba(255, 255, 255, ${brightness / 100})`;
-        element.style.borderColor = `rgb(${val}, ${val}, ${val})`;
+          // Only apply standard drop-shadow if not focused
+          if (!element.classList.contains('focused')) {
+            element.style.filter = `drop-shadow(0 0 ${brightness / 10}px rgba(255, 255, 255, 0.8))`;
+          }
+        } else {
+          element.setAttribute("fill", "transparent");
+          element.setAttribute("stroke", "transparent");
+          if (!element.classList.contains('focused')) {
+            element.style.filter = "none";
+          }
+        }
       } else {
-        element.style.boxShadow = `none`;
-        element.style.borderColor = `#555`;
+        // HTML div styling
+        element.style.backgroundColor = `rgb(${val}, ${val}, ${val})`;
+        if (brightness > 0) {
+          element.style.boxShadow = `0 0 ${brightness / 3}px rgba(255, 255, 255, ${brightness / 100})`;
+          element.style.borderColor = `rgb(${val}, ${val}, ${val})`;
+        } else {
+          element.style.boxShadow = `none`;
+          element.style.borderColor = `#555`;
+        }
       }
     }
 
@@ -1199,7 +1302,12 @@
       return bStart; // Hold last value
     }
 
-    window.onload = buildDynamicFields;
+    // Initialize on load
+    window.onload = () => {
+      initVehicles();
+      loadSelectedTemplate();
+      buildDynamicFields(); // Ensure initialization even if no template is selected
+    };
   </script>
 </body>
 
