@@ -10,13 +10,6 @@ Advanced Welcome Light Visualizer — a client-side web tool for analyzing and e
 
 No build system, dependencies, or installation. Open `index.html` directly in a browser. There are no tests, linting, or formatting tools configured.
 
-### Template Generation
-
-`parse_templates.py` reads raw template files from `Templates/` and generates `templates.js`. Run it with Python 3 when template files change:
-```
-python3 parse_templates.py
-```
-
 ## Architecture
 
 ### File Layout
