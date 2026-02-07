@@ -1,0 +1,7 @@
+{
+  "name": "advanced-welcome-light-visualizer",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/run-tests.js"
+  }
+}
