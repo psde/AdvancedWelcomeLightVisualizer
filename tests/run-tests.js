@@ -149,40 +149,41 @@ describe('parseAllSequencesFromBytes', () => {
 // ============================================================================
 // Section 5: Reassembly Tests
 // ============================================================================
-describe('reAssembleLeftBytes', () => {
+describe('reAssembleBytes (left)', () => {
   it('should pad to 252/168 for empty sequences', () => {
-    sequencesLeft = [];
-    reAssembleLeftBytes();
-    assert.strictEqual(left1Bytes.length, 252);
-    assert.strictEqual(left2Bytes.length, 168);
-    assert.ok(left1Bytes.every(b => b === '00'), 'left1Bytes should be all zeros');
-    assert.ok(left2Bytes.every(b => b === '00'), 'left2Bytes should be all zeros');
+    sideData.left.sequences = [];
+    reAssembleBytes('left');
+    assert.strictEqual(sideData.left.staging1Bytes.length, 252);
+    assert.strictEqual(sideData.left.staging2Bytes.length, 168);
+    assert.ok(sideData.left.staging1Bytes.every(b => b === '00'), 'staging1Bytes should be all zeros');
+    assert.ok(sideData.left.staging2Bytes.every(b => b === '00'), 'staging2Bytes should be all zeros');
   });
 
   it('should reconstruct header from sequence fields', () => {
-    sequencesLeft = [{ identifier: '01', lengthVal: 2, data: ['AA', 'BB', 'CC', 'DD'] }];
-    reAssembleLeftBytes();
+    sideData.left.sequences = [{ identifier: '01', lengthVal: 2, data: ['AA', 'BB', 'CC', 'DD'] }];
+    reAssembleBytes('left');
+    const s1 = sideData.left.staging1Bytes;
     // Header: 01, 00, 02, AA, BB, CC, DD, then padded with 00s
-    assert.strictEqual(left1Bytes[0].toUpperCase(), '01');
-    assert.strictEqual(left1Bytes[1].toUpperCase(), '00');
-    assert.strictEqual(left1Bytes[2].toUpperCase(), '02');
-    assert.strictEqual(left1Bytes[3].toUpperCase(), 'AA');
-    assert.strictEqual(left1Bytes[4].toUpperCase(), 'BB');
-    assert.strictEqual(left1Bytes[5].toUpperCase(), 'CC');
-    assert.strictEqual(left1Bytes[6].toUpperCase(), 'DD');
+    assert.strictEqual(s1[0].toUpperCase(), '01');
+    assert.strictEqual(s1[1].toUpperCase(), '00');
+    assert.strictEqual(s1[2].toUpperCase(), '02');
+    assert.strictEqual(s1[3].toUpperCase(), 'AA');
+    assert.strictEqual(s1[4].toUpperCase(), 'BB');
+    assert.strictEqual(s1[5].toUpperCase(), 'CC');
+    assert.strictEqual(s1[6].toUpperCase(), 'DD');
     // Rest should be padded
     for (let i = 7; i < 252; i++) {
-      assert.strictEqual(left1Bytes[i], '00');
+      assert.strictEqual(s1[i], '00');
     }
-    assert.strictEqual(left2Bytes.length, 168);
+    assert.strictEqual(sideData.left.staging2Bytes.length, 168);
   });
 
   it('should pass through RAW data without header', () => {
-    sequencesLeft = [{ identifier: 'RAW', lengthVal: 3, data: ['FF', 'EE', 'DD'] }];
-    reAssembleLeftBytes();
-    assert.strictEqual(left1Bytes[0].toUpperCase(), 'FF');
-    assert.strictEqual(left1Bytes[1].toUpperCase(), 'EE');
-    assert.strictEqual(left1Bytes[2].toUpperCase(), 'DD');
+    sideData.left.sequences = [{ identifier: 'RAW', lengthVal: 3, data: ['FF', 'EE', 'DD'] }];
+    reAssembleBytes('left');
+    assert.strictEqual(sideData.left.staging1Bytes[0].toUpperCase(), 'FF');
+    assert.strictEqual(sideData.left.staging1Bytes[1].toUpperCase(), 'EE');
+    assert.strictEqual(sideData.left.staging1Bytes[2].toUpperCase(), 'DD');
   });
 
   it('should split data across staging1/staging2 boundary', () => {
@@ -190,46 +191,46 @@ describe('reAssembleLeftBytes', () => {
     const data = [];
     for (let i = 0; i < 260; i++) data.push('FF');
     // lengthVal = 130 pairs => 260 data bytes; header = 3 bytes; total = 263
-    sequencesLeft = [{ identifier: '01', lengthVal: 130, data: data }];
-    reAssembleLeftBytes();
-    assert.strictEqual(left1Bytes.length, 252);
-    assert.strictEqual(left2Bytes.length, 168);
-    // First 252 bytes in left1Bytes (3 header + 249 data)
-    assert.strictEqual(left1Bytes[0].toUpperCase(), '01');
-    // Remaining 11 data bytes should be in left2Bytes
-    assert.strictEqual(left2Bytes[0].toUpperCase(), 'FF');
-    assert.strictEqual(left2Bytes[10].toUpperCase(), 'FF');
-    // left2Bytes[11] onward should be padding
-    assert.strictEqual(left2Bytes[11], '00');
+    sideData.left.sequences = [{ identifier: '01', lengthVal: 130, data: data }];
+    reAssembleBytes('left');
+    assert.strictEqual(sideData.left.staging1Bytes.length, 252);
+    assert.strictEqual(sideData.left.staging2Bytes.length, 168);
+    // First 252 bytes in staging1Bytes (3 header + 249 data)
+    assert.strictEqual(sideData.left.staging1Bytes[0].toUpperCase(), '01');
+    // Remaining 11 data bytes should be in staging2Bytes
+    assert.strictEqual(sideData.left.staging2Bytes[0].toUpperCase(), 'FF');
+    assert.strictEqual(sideData.left.staging2Bytes[10].toUpperCase(), 'FF');
+    // staging2Bytes[11] onward should be padding
+    assert.strictEqual(sideData.left.staging2Bytes[11], '00');
   });
 
   it('should skip null sequences', () => {
-    sequencesLeft = [null, { identifier: '01', lengthVal: 1, data: ['AA', 'BB'] }];
-    reAssembleLeftBytes();
-    assert.strictEqual(left1Bytes[0].toUpperCase(), '01');
-    assert.strictEqual(left1Bytes[1].toUpperCase(), '00');
-    assert.strictEqual(left1Bytes[2].toUpperCase(), '01');
-    assert.strictEqual(left1Bytes[3].toUpperCase(), 'AA');
-    assert.strictEqual(left1Bytes[4].toUpperCase(), 'BB');
+    sideData.left.sequences = [null, { identifier: '01', lengthVal: 1, data: ['AA', 'BB'] }];
+    reAssembleBytes('left');
+    assert.strictEqual(sideData.left.staging1Bytes[0].toUpperCase(), '01');
+    assert.strictEqual(sideData.left.staging1Bytes[1].toUpperCase(), '00');
+    assert.strictEqual(sideData.left.staging1Bytes[2].toUpperCase(), '01');
+    assert.strictEqual(sideData.left.staging1Bytes[3].toUpperCase(), 'AA');
+    assert.strictEqual(sideData.left.staging1Bytes[4].toUpperCase(), 'BB');
   });
 });
 
-describe('reAssembleRightBytes', () => {
+describe('reAssembleBytes (right)', () => {
   it('should pad to 252/168 for empty sequences', () => {
-    sequencesRight = [];
-    reAssembleRightBytes();
-    assert.strictEqual(right1Bytes.length, 252);
-    assert.strictEqual(right2Bytes.length, 168);
+    sideData.right.sequences = [];
+    reAssembleBytes('right');
+    assert.strictEqual(sideData.right.staging1Bytes.length, 252);
+    assert.strictEqual(sideData.right.staging2Bytes.length, 168);
   });
 
   it('should reconstruct header from sequence fields', () => {
-    sequencesRight = [{ identifier: '02', lengthVal: 1, data: ['AA', 'BB'] }];
-    reAssembleRightBytes();
-    assert.strictEqual(right1Bytes[0].toUpperCase(), '02');
-    assert.strictEqual(right1Bytes[1].toUpperCase(), '00');
-    assert.strictEqual(right1Bytes[2].toUpperCase(), '01');
-    assert.strictEqual(right1Bytes[3].toUpperCase(), 'AA');
-    assert.strictEqual(right1Bytes[4].toUpperCase(), 'BB');
+    sideData.right.sequences = [{ identifier: '02', lengthVal: 1, data: ['AA', 'BB'] }];
+    reAssembleBytes('right');
+    assert.strictEqual(sideData.right.staging1Bytes[0].toUpperCase(), '02');
+    assert.strictEqual(sideData.right.staging1Bytes[1].toUpperCase(), '00');
+    assert.strictEqual(sideData.right.staging1Bytes[2].toUpperCase(), '01');
+    assert.strictEqual(sideData.right.staging1Bytes[3].toUpperCase(), 'AA');
+    assert.strictEqual(sideData.right.staging1Bytes[4].toUpperCase(), 'BB');
   });
 });
 
@@ -245,9 +246,9 @@ describe('Round-trip: parse then reassemble per template', () => {
 
         const seqs = parseAllSequencesFromBytes(orig1.slice(), orig2.slice());
 
-        // Reassemble via globals
-        sequencesLeft = seqs;
-        reAssembleLeftBytes();
+        // Reassemble via sideData
+        sideData.left.sequences = seqs;
+        reAssembleBytes('left');
 
         // Build expected: pad originals to 252/168
         const expected1 = orig1.slice();
@@ -258,8 +259,8 @@ describe('Round-trip: parse then reassemble per template', () => {
         while (expected2.length < 168) expected2.push('00');
         expected2.length = 168;
 
-        assertHexArrayEqual(left1Bytes, expected1, name + ' left staging1');
-        assertHexArrayEqual(left2Bytes, expected2, name + ' left staging2');
+        assertHexArrayEqual(sideData.left.staging1Bytes, expected1, name + ' left staging1');
+        assertHexArrayEqual(sideData.left.staging2Bytes, expected2, name + ' left staging2');
       });
 
       it('should round-trip right side', () => {
@@ -268,8 +269,8 @@ describe('Round-trip: parse then reassemble per template', () => {
 
         const seqs = parseAllSequencesFromBytes(orig1.slice(), orig2.slice());
 
-        sequencesRight = seqs;
-        reAssembleRightBytes();
+        sideData.right.sequences = seqs;
+        reAssembleBytes('right');
 
         const expected1 = orig1.slice();
         while (expected1.length < 252) expected1.push('00');
@@ -279,8 +280,8 @@ describe('Round-trip: parse then reassemble per template', () => {
         while (expected2.length < 168) expected2.push('00');
         expected2.length = 168;
 
-        assertHexArrayEqual(right1Bytes, expected1, name + ' right staging1');
-        assertHexArrayEqual(right2Bytes, expected2, name + ' right staging2');
+        assertHexArrayEqual(sideData.right.staging1Bytes, expected1, name + ' right staging1');
+        assertHexArrayEqual(sideData.right.staging2Bytes, expected2, name + ' right staging2');
       });
     });
   }
@@ -388,22 +389,22 @@ describe('Edge cases', () => {
     // Use 248 data bytes: lengthVal=124, total = 3 + 248 = 251
     // Then pad. Let's just use a known size.
     const data = Array(248).fill('FF');
-    sequencesLeft = [{ identifier: '01', lengthVal: 124, data: data }];
-    reAssembleLeftBytes();
-    assert.strictEqual(left1Bytes.length, 252);
+    sideData.left.sequences = [{ identifier: '01', lengthVal: 124, data: data }];
+    reAssembleBytes('left');
+    assert.strictEqual(sideData.left.staging1Bytes.length, 252);
     // 3 header + 248 data = 251, so byte 251 (index 251) should be padding
-    assert.strictEqual(left1Bytes[251], '00');
-    assert.strictEqual(left2Bytes.length, 168);
-    assert.ok(left2Bytes.every(b => b === '00'));
+    assert.strictEqual(sideData.left.staging1Bytes[251], '00');
+    assert.strictEqual(sideData.left.staging2Bytes.length, 168);
+    assert.ok(sideData.left.staging2Bytes.every(b => b === '00'));
   });
 
   it('should handle overflow beyond 420 bytes (252+168) via ensureMaxSize behavior', () => {
-    // Total bytes > 420: left2Bytes is sliced to MAX_LEFT2 (168)
+    // Total bytes > 420: staging2Bytes is sliced to MAX_STAGING2 (168)
     const data = Array(500).fill('FF');
-    sequencesLeft = [{ identifier: 'RAW', lengthVal: 500, data: data }];
-    reAssembleLeftBytes();
-    assert.strictEqual(left1Bytes.length, 252);
-    assert.strictEqual(left2Bytes.length, 168);
+    sideData.left.sequences = [{ identifier: 'RAW', lengthVal: 500, data: data }];
+    reAssembleBytes('left');
+    assert.strictEqual(sideData.left.staging1Bytes.length, 252);
+    assert.strictEqual(sideData.left.staging2Bytes.length, 168);
   });
 
   it('should handle empty staging2 template correctly', () => {
@@ -415,12 +416,12 @@ describe('Edge cases', () => {
     assert.strictEqual(orig2.length, 0);
 
     const seqs = parseAllSequencesFromBytes(orig1, orig2);
-    sequencesLeft = seqs;
-    reAssembleLeftBytes();
+    sideData.left.sequences = seqs;
+    reAssembleBytes('left');
 
-    assert.strictEqual(left1Bytes.length, 252);
-    assert.strictEqual(left2Bytes.length, 168);
-    assert.ok(left2Bytes.every(b => b === '00'), 'staging2 should be all zeros for empty template');
+    assert.strictEqual(sideData.left.staging1Bytes.length, 252);
+    assert.strictEqual(sideData.left.staging2Bytes.length, 168);
+    assert.ok(sideData.left.staging2Bytes.every(b => b === '00'), 'staging2 should be all zeros for empty template');
   });
 
   it('buildByteString should join with comma-space', () => {

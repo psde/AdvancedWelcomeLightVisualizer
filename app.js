@@ -1,10 +1,14 @@
 // ============================================================================
 // Global const and helper functions
 // ============================================================================
-const MAX_LEFT1 = 252;
-const MAX_LEFT2 = 168;
-const MAX_RIGHT1 = 252;
-const MAX_RIGHT2 = 168;
+const MAX_STAGING1 = 252;
+const MAX_STAGING2 = 168;
+
+// Unified side data structure
+const sideData = {
+  left:  { staging1Bytes: [], staging2Bytes: [], sequences: [] },
+  right: { staging1Bytes: [], staging2Bytes: [], sequences: [] }
+};
 
 function parseByteString(str) {
   if (!str) return [];
@@ -22,10 +26,7 @@ function ensureMaxSize(arr, maxSize) {
 }
 
 function updateUsageUI(side, totalLen) {
-  const isLeft = (side === 'left');
-  const max1 = isLeft ? MAX_LEFT1 : MAX_RIGHT1;
-  const max2 = isLeft ? MAX_LEFT2 : MAX_RIGHT2;
-  const totalMax = max1 + max2;
+  const totalMax = MAX_STAGING1 + MAX_STAGING2;
   const overMax = totalLen > totalMax;
 
   const c1 = document.getElementById(`counter_${side}Staging1`);
@@ -35,20 +36,14 @@ function updateUsageUI(side, totalLen) {
   const i1 = document.getElementById(`${side}Staging1`);
   const i2 = document.getElementById(`${side}Staging2`);
 
-  if (c1) c1.textContent = `(${Math.min(totalLen, max1)} / ${max1} Bytes)`;
-  if (c2) c2.textContent = `(${Math.max(0, Math.min(totalLen - max1, max2))} / ${max2} Bytes)`;
+  if (c1) c1.textContent = `(${Math.min(totalLen, MAX_STAGING1)} / ${MAX_STAGING1} Bytes)`;
+  if (c2) c2.textContent = `(${Math.max(0, Math.min(totalLen - MAX_STAGING1, MAX_STAGING2))} / ${MAX_STAGING2} Bytes)`;
 
-  if (overMax) {
-    if (l1) l1.classList.add("overflow-error");
-    if (l2) l2.classList.add("overflow-error");
-    if (i1) i1.classList.add("overflow-error");
-    if (i2) i2.classList.add("overflow-error");
-  } else {
-    if (l1) l1.classList.remove("overflow-error");
-    if (l2) l2.classList.remove("overflow-error");
-    if (i1) i1.classList.remove("overflow-error");
-    if (i2) i2.classList.remove("overflow-error");
-  }
+  const method = overMax ? "add" : "remove";
+  if (l1) l1.classList[method]("overflow-error");
+  if (l2) l2.classList[method]("overflow-error");
+  if (i1) i1.classList[method]("overflow-error");
+  if (i2) i2.classList[method]("overflow-error");
 }
 
 // ============================================================================
@@ -83,7 +78,6 @@ function pasteFromClipboard(fieldId) {
 // Clear all Fields function
 // ============================================================================
 function clearAllFields() {
-  // Leert alle vier Hauptfelder
   document.getElementById("leftStaging1").value = "";
   document.getElementById("leftStaging2").value = "";
   document.getElementById("rightStaging1").value = "";
@@ -91,13 +85,9 @@ function clearAllFields() {
 }
 
 // ============================================================================
-// 1) Main storage of Bytes and sequences
+// 1) Chart sketches and edit mode state
 // ============================================================================
-let left1Bytes = [], left2Bytes = [], right1Bytes = [], right2Bytes = [];
-let sequencesLeft = [], sequencesRight = [];
-
-let chartSketchesLeft = [];
-let chartSketchesRight = [];
+let chartSketches = [];
 
 // Edit mode state: 'hex' or 'visual' per sequence
 let editModes = { left: {}, right: {} };
@@ -115,7 +105,7 @@ function renderSequenceEditor(side, seqIndex) {
   if (!container) return;
 
   const mode = editModes[side][seqIndex] || 'hex';
-  const seq = (side === 'left') ? sequencesLeft[seqIndex] : sequencesRight[seqIndex];
+  const seq = sideData[side].sequences[seqIndex];
 
   // Update toggle buttons
   const toggleDiv = container.querySelector('.editor-toggle');
@@ -149,14 +139,9 @@ function renderHexEditor(container, side, seqIndex, seq) {
   ta.style.fontFamily = 'monospace';
   ta.style.fontSize = '11px';
   ta.oninput = (e) => {
-    if (side === 'left') {
-      sequencesLeft[seqIndex] = stringToSequence(e.target.value);
-      reAssembleLeftBytes();
-    } else {
-      sequencesRight[seqIndex] = stringToSequence(e.target.value);
-      reAssembleRightBytes();
-    }
-    updateSingleDiagram(side, seqIndex);
+    sideData[side].sequences[seqIndex] = stringToSequence(e.target.value);
+    reAssembleBytes(side);
+    updateSingleDiagram(seqIndex);
     updateVisuals(currentAnimTime);
   };
   container.appendChild(ta);
@@ -220,7 +205,7 @@ function renderVisualEditor(container, side, seqIndex, seq) {
     // Remove button
     const removeBtn = document.createElement('button');
     removeBtn.className = 'step-remove';
-    removeBtn.textContent = '✕';
+    removeBtn.textContent = '\u2715';
     removeBtn.onclick = () => removeStep(side, seqIndex, stepIdx);
     row.appendChild(removeBtn);
 
@@ -282,34 +267,27 @@ function renderVisualEditor(container, side, seqIndex, seq) {
 
 function copySequence(fromSide, seqIndex) {
   const toSide = fromSide === 'left' ? 'right' : 'left';
-  const fromSeq = fromSide === 'left' ? sequencesLeft[seqIndex] : sequencesRight[seqIndex];
+  const fromSeq = sideData[fromSide].sequences[seqIndex];
 
   if (!fromSeq) return;
 
   // Deep copy the sequence
-  const copiedSeq = {
+  sideData[toSide].sequences[seqIndex] = {
     identifier: fromSeq.identifier,
     lengthVal: fromSeq.lengthVal,
     data: [...fromSeq.data]
   };
 
-  // Assign to target side
-  if (toSide === 'left') {
-    sequencesLeft[seqIndex] = copiedSeq;
-    reAssembleLeftBytes();
-  } else {
-    sequencesRight[seqIndex] = copiedSeq;
-    reAssembleRightBytes();
-  }
+  reAssembleBytes(toSide);
 
   // Re-render the target editor and update diagram
   renderSequenceEditor(toSide, seqIndex);
-  updateSingleDiagram(toSide, seqIndex);
+  updateSingleDiagram(seqIndex);
   updateVisuals(currentAnimTime);
 }
 
 function updateStepValue(side, seqIndex, stepIndex, type, value) {
-  const seq = (side === 'left') ? sequencesLeft[seqIndex] : sequencesRight[seqIndex];
+  const seq = sideData[side].sequences[seqIndex];
   if (!seq || seq.identifier === 'RAW') return;
 
   const dataIdx = stepIndex * 2 + (type === 'duration' ? 0 : 1);
@@ -319,36 +297,28 @@ function updateStepValue(side, seqIndex, stepIndex, type, value) {
     // Recalculate length if needed (lengthVal = number of step pairs)
     seq.lengthVal = Math.floor(seq.data.length / 2);
 
-    if (side === 'left') {
-      reAssembleLeftBytes();
-    } else {
-      reAssembleRightBytes();
-    }
-    updateSingleDiagram(side, seqIndex);
+    reAssembleBytes(side);
+    updateSingleDiagram(seqIndex);
     updateVisuals(currentAnimTime);
   }
 }
 
 function addStep(side, seqIndex) {
-  const seq = (side === 'left') ? sequencesLeft[seqIndex] : sequencesRight[seqIndex];
+  const seq = sideData[side].sequences[seqIndex];
   if (!seq || seq.identifier === 'RAW') return;
 
   // Add default step: 10 (100ms), 00 (0%)
   seq.data.push('0A', '00');
   seq.lengthVal = Math.floor(seq.data.length / 2);
 
-  if (side === 'left') {
-    reAssembleLeftBytes();
-  } else {
-    reAssembleRightBytes();
-  }
-  updateSingleDiagram(side, seqIndex);
+  reAssembleBytes(side);
+  updateSingleDiagram(seqIndex);
   updateVisuals(currentAnimTime);
   renderSequenceEditor(side, seqIndex);
 }
 
 function removeStep(side, seqIndex, stepIndex) {
-  const seq = (side === 'left') ? sequencesLeft[seqIndex] : sequencesRight[seqIndex];
+  const seq = sideData[side].sequences[seqIndex];
   if (!seq || seq.identifier === 'RAW') return;
 
   // Remove 2 bytes for this step
@@ -357,12 +327,8 @@ function removeStep(side, seqIndex, stepIndex) {
     seq.data.splice(dataIdx, 2);
     seq.lengthVal = Math.floor(seq.data.length / 2);
 
-    if (side === 'left') {
-      reAssembleLeftBytes();
-    } else {
-      reAssembleRightBytes();
-    }
-    updateSingleDiagram(side, seqIndex);
+    reAssembleBytes(side);
+    updateSingleDiagram(seqIndex);
     updateVisuals(currentAnimTime);
     renderSequenceEditor(side, seqIndex);
   }
@@ -384,33 +350,29 @@ function calculateSeqsSize(seqs) {
 // 2) Main work
 // ============================================================================
 function buildDynamicFields() {
-  // 1) Read the main input fields
-  const leftStaging1 = document.getElementById("leftStaging1").value;
-  const leftStaging2 = document.getElementById("leftStaging2").value;
-  const rightStaging1 = document.getElementById("rightStaging1").value;
-  const rightStaging2 = document.getElementById("rightStaging2").value;
+  for (const side of ['left', 'right']) {
+    const sd = sideData[side];
 
-  // 2) Parse in Byte-Arrays
-  left1Bytes = parseByteString(leftStaging1);
-  left2Bytes = parseByteString(leftStaging2);
-  right1Bytes = parseByteString(rightStaging1);
-  right2Bytes = parseByteString(rightStaging2);
+    // Read the main input fields
+    const s1 = document.getElementById(`${side}Staging1`).value;
+    const s2 = document.getElementById(`${side}Staging2`).value;
 
-  // 3) Check length
-  ensureMaxSize(left1Bytes, MAX_LEFT1);
-  ensureMaxSize(left2Bytes, MAX_LEFT2);
-  ensureMaxSize(right1Bytes, MAX_RIGHT1);
-  ensureMaxSize(right2Bytes, MAX_RIGHT2);
+    // Parse into byte arrays
+    sd.staging1Bytes = parseByteString(s1);
+    sd.staging2Bytes = parseByteString(s2);
 
-  // 4) Extract sequences
-  sequencesLeft = parseAllSequencesFromBytes(left1Bytes, left2Bytes);
-  sequencesRight = parseAllSequencesFromBytes(right1Bytes, right2Bytes);
+    // Check length
+    ensureMaxSize(sd.staging1Bytes, MAX_STAGING1);
+    ensureMaxSize(sd.staging2Bytes, MAX_STAGING2);
 
-  // 5) Update UI counters (excluding padding)
-  updateUsageUI('left', calculateSeqsSize(sequencesLeft));
-  updateUsageUI('right', calculateSeqsSize(sequencesRight));
+    // Extract sequences
+    sd.sequences = parseAllSequencesFromBytes(sd.staging1Bytes, sd.staging2Bytes);
 
-  // 6) Create dynamic fields
+    // Update UI counters (excluding padding)
+    updateUsageUI(side, calculateSeqsSize(sd.sequences));
+  }
+
+  // Create dynamic fields
   renderDynamicSequences();
   rebuildAnimationPlayer();
 }
@@ -520,9 +482,8 @@ function renderDynamicSequences() {
   const container = document.getElementById("dynamicContainer");
 
   // Cleanup old sketches to prevent memory leaks and ghost interactions
-  chartSketchesLeft.forEach(s => { if (s && s.remove) s.remove(); });
-  chartSketchesLeft = [];
-  chartSketchesRight = [];
+  chartSketches.forEach(s => { if (s && s.remove) s.remove(); });
+  chartSketches = [];
 
   // Sticky Checkbox and Logic
   const playerDiv = document.getElementById("animationPlayer");
@@ -543,12 +504,6 @@ function renderDynamicSequences() {
     stickyInput.onchange = (e) => {
       if (e.target.checked) {
         playerDiv.classList.add("sticky");
-        // Optional: Move up in DOM to ensure it sticks relative to body if needed?
-        // Actually sticky works within flow. We just need to make sure
-        // no parent has overflow: hidden. Body is flex col so it should be fine.
-
-        // One tweak: when sticky, we might want a bit of top margin/padding adjustment
-        // so it doesn't overlap weirdly. But CSS box-shadow helps.
       } else {
         playerDiv.classList.remove("sticky");
       }
@@ -562,74 +517,18 @@ function renderDynamicSequences() {
   container.innerHTML = "";
 
   // Number of blocks
-  let maxSeq = Math.max(sequencesLeft.length, sequencesRight.length);
+  const maxSeq = Math.max(sideData.left.sequences.length, sideData.right.sequences.length);
 
   for (let i = 0; i < maxSeq; i++) {
-    const leftSeq = sequencesLeft[i];
-    const rightSeq = sequencesRight[i];
-
     const seqBlock = document.createElement("div");
     seqBlock.className = "seq-block";
 
-    // left Subblock
-    const leftSub = document.createElement("div");
-    leftSub.className = "seq-subblock";
-    let leftH4 = document.createElement("h4");
-    leftH4.style.display = "flex";
-    leftH4.style.justifyContent = "space-between";
-    leftH4.style.alignItems = "center";
-    leftH4.innerHTML = `<span>Seq Left #${i + 1}</span> <button class="mini-copy-btn" onclick="copySequence('left', ${i})" title="Copy Left → Right">→</button>`;
-    leftSub.appendChild(leftH4);
-
-    // Editor container with toggle
-    const leftEditor = document.createElement("div");
-    leftEditor.id = `editor_left_${i}`;
-
-    // Toggle buttons
-    const leftToggle = document.createElement("div");
-    leftToggle.className = "editor-toggle";
-    leftToggle.innerHTML = `
-      <button data-mode="visual" onclick="toggleEditMode('left', ${i}, 'visual')">📝 Visual</button>
-      <button data-mode="hex" class="active" onclick="toggleEditMode('left', ${i}, 'hex')">&lt;&gt; Hex</button>
-    `;
-    leftEditor.appendChild(leftToggle);
-    leftSub.appendChild(leftEditor);
-
-    seqBlock.appendChild(leftSub);
-
-    // right Subblock
-    const rightSub = document.createElement("div");
-    rightSub.className = "seq-subblock";
-    let rightH4 = document.createElement("h4");
-    rightH4.style.display = "flex";
-    rightH4.style.justifyContent = "space-between";
-    rightH4.style.alignItems = "center";
-    rightH4.style.flexDirection = "row-reverse"; // Arrow on the left for right side
-    rightH4.innerHTML = `<span>Seq Right #${i + 1}</span> <button class="mini-copy-btn" onclick="copySequence('right', ${i})" title="Copy Right → Left">←</button>`;
-    rightSub.appendChild(rightH4);
-
-    // Editor container with toggle
-    const rightEditor = document.createElement("div");
-    rightEditor.id = `editor_right_${i}`;
-
-    // Toggle buttons
-    const rightToggle = document.createElement("div");
-    rightToggle.className = "editor-toggle";
-    rightToggle.innerHTML = `
-      <button data-mode="visual" onclick="toggleEditMode('right', ${i}, 'visual')">📝 Visual</button>
-      <button data-mode="hex" class="active" onclick="toggleEditMode('right', ${i}, 'hex')">&lt;&gt; Hex</button>
-    `;
-    rightEditor.appendChild(rightToggle);
-    rightSub.appendChild(rightEditor);
-
-    seqBlock.appendChild(rightSub);
+    seqBlock.appendChild(createSeqSubblock('left', i));
+    seqBlock.appendChild(createSeqSubblock('right', i));
 
     let chartDiv = document.createElement("div");
     chartDiv.id = `chartCanvas_${i}`;
     chartDiv.className = "chartCanvas";
-    // REMOVED fixed width/height inline styles to let CSS control it
-    // But p5 needs a size. We can get it from clientWidth.
-    // We'll set a default minimum height.
     chartDiv.style.height = "250px";
     chartDiv.textContent = `Diagram Sequence #${i + 1}`;
     seqBlock.appendChild(chartDiv);
@@ -643,10 +542,44 @@ function renderDynamicSequences() {
     renderSequenceEditor('right', i);
 
     // Initial p5 Sketch
-    let s = createSingleChart(i, chartDiv);
-    chartSketchesLeft[i] = s;
-    chartSketchesRight[i] = s;
+    chartSketches[i] = createSingleChart(i, chartDiv);
   }
+}
+
+function createSeqSubblock(side, seqIndex) {
+  const isLeft = (side === 'left');
+  const label = isLeft ? 'Left' : 'Right';
+  const otherSide = isLeft ? 'Right' : 'Left';
+  const arrow = isLeft ? '\u2192' : '\u2190';
+  const copyTitle = `Copy ${label} \u2192 ${otherSide}`;
+
+  const sub = document.createElement("div");
+  sub.className = "seq-subblock";
+
+  const h4 = document.createElement("h4");
+  h4.style.display = "flex";
+  h4.style.justifyContent = "space-between";
+  h4.style.alignItems = "center";
+  if (!isLeft) {
+    h4.style.flexDirection = "row-reverse";
+  }
+  h4.innerHTML = `<span>Seq ${label} #${seqIndex + 1}</span> <button class="mini-copy-btn" onclick="copySequence('${side}', ${seqIndex})" title="${copyTitle}">${arrow}</button>`;
+  sub.appendChild(h4);
+
+  // Editor container with toggle
+  const editor = document.createElement("div");
+  editor.id = `editor_${side}_${seqIndex}`;
+
+  const toggle = document.createElement("div");
+  toggle.className = "editor-toggle";
+  toggle.innerHTML = `
+    <button data-mode="visual" onclick="toggleEditMode('${side}', ${seqIndex}, 'visual')">\ud83d\udcdd Visual</button>
+    <button data-mode="hex" class="active" onclick="toggleEditMode('${side}', ${seqIndex}, 'hex')">&lt;&gt; Hex</button>
+  `;
+  editor.appendChild(toggle);
+  sub.appendChild(editor);
+
+  return sub;
 }
 
 /**
@@ -686,11 +619,12 @@ function stringToSequence(text) {
 }
 
 /**
- * Re-assembling => left1Bytes + left2Bytes
+ * Re-assembling bytes for a given side
  */
-function reAssembleLeftBytes() {
+function reAssembleBytes(side) {
+  const sd = sideData[side];
   let combined = [];
-  for (let seq of sequencesLeft) {
+  for (let seq of sd.sequences) {
     if (!seq) continue;
     if (seq.identifier === "RAW") {
       combined.push(...seq.data);
@@ -700,51 +634,18 @@ function reAssembleLeftBytes() {
     }
   }
 
-  const totalLen = combined.length;
-  updateUsageUI('left', totalLen);
+  updateUsageUI(side, combined.length);
 
-  left1Bytes = combined.slice(0, MAX_LEFT1);
-  let leftover = combined.slice(MAX_LEFT1);
-  left2Bytes = leftover.slice(0, MAX_LEFT2);
+  sd.staging1Bytes = combined.slice(0, MAX_STAGING1);
+  sd.staging2Bytes = combined.slice(MAX_STAGING1, MAX_STAGING1 + MAX_STAGING2);
 
-  while (left1Bytes.length < MAX_LEFT1) left1Bytes.push("00");
-  while (left2Bytes.length < MAX_LEFT2) left2Bytes.push("00");
+  while (sd.staging1Bytes.length < MAX_STAGING1) sd.staging1Bytes.push("00");
+  while (sd.staging2Bytes.length < MAX_STAGING2) sd.staging2Bytes.push("00");
 
-  const i1 = document.getElementById("leftStaging1");
-  const i2 = document.getElementById("leftStaging2");
-  if (i1) i1.value = buildByteString(left1Bytes);
-  if (i2) i2.value = buildByteString(left2Bytes);
-}
-
-/**
- * Re-assembling => right1Bytes + right2Bytes
- */
-function reAssembleRightBytes() {
-  let combined = [];
-  for (let seq of sequencesRight) {
-    if (!seq) continue;
-    if (seq.identifier === "RAW") {
-      combined.push(...seq.data);
-    } else {
-      let hl = seq.lengthVal.toString(16).padStart(4, "0").toUpperCase();
-      combined.push(seq.identifier, hl.slice(0, 2), hl.slice(2, 4), ...seq.data);
-    }
-  }
-
-  const totalLen = combined.length;
-  updateUsageUI('right', totalLen);
-
-  right1Bytes = combined.slice(0, MAX_RIGHT1);
-  let leftover = combined.slice(MAX_RIGHT1);
-  right2Bytes = leftover.slice(0, MAX_RIGHT2);
-
-  while (right1Bytes.length < MAX_RIGHT1) right1Bytes.push("00");
-  while (right2Bytes.length < MAX_RIGHT2) right2Bytes.push("00");
-
-  const i1 = document.getElementById("rightStaging1");
-  const i2 = document.getElementById("rightStaging2");
-  if (i1) i1.value = buildByteString(right1Bytes);
-  if (i2) i2.value = buildByteString(right2Bytes);
+  const i1 = document.getElementById(`${side}Staging1`);
+  const i2 = document.getElementById(`${side}Staging2`);
+  if (i1) i1.value = buildByteString(sd.staging1Bytes);
+  if (i2) i2.value = buildByteString(sd.staging2Bytes);
 }
 
 /**
@@ -775,8 +676,6 @@ function createSingleChart(seqIndex, containerDiv) {
     };
 
     sketch.windowResized = () => {
-      // Optional: handle resize logic if needed.
-      // Re-measure container and resize canvas.
       let cw = containerDiv.clientWidth;
       sketch.resizeCanvas(cw, sketch.height);
       w = sketch.width - 2 * margin;
@@ -784,8 +683,8 @@ function createSingleChart(seqIndex, containerDiv) {
 
     sketch.draw = () => {
       sketch.background(255);
-      let leftSeq = sequencesLeft[seqIndex];
-      let rightSeq = sequencesRight[seqIndex];
+      let leftSeq = sideData.left.sequences[seqIndex];
+      let rightSeq = sideData.right.sequences[seqIndex];
       let leftData = parseForChart(leftSeq);
       let rightData = parseForChart(rightSeq);
 
@@ -957,20 +856,15 @@ function parseForChart(seq) {
 }
 
 // ============================================================================
-// 3) Update-Button => updateSingleDiagram("left"/"right", i)
+// 3) Update diagram for a given sequence index
 // ============================================================================
-function updateSingleDiagram(side, seqIndex) {
-
-  let s = (side === "left") ? chartSketchesLeft[seqIndex] : chartSketchesRight[seqIndex];
+function updateSingleDiagram(seqIndex) {
+  let s = chartSketches[seqIndex];
   if (s) s.remove();
 
   // Create new
   let chartDiv = document.getElementById(`chartCanvas_${seqIndex}`);
-  let newSketch = createSingleChart(seqIndex, chartDiv);
-
-  // Save
-  chartSketchesLeft[seqIndex] = newSketch;
-  chartSketchesRight[seqIndex] = newSketch;
+  chartSketches[seqIndex] = createSingleChart(seqIndex, chartDiv);
 }
 
 // ============================================================================
@@ -1000,10 +894,12 @@ function rebuildAnimationPlayer() {
 
   // Calculate total duration (max of all sequences)
   totalDuration = 0;
-  [...sequencesLeft, ...sequencesRight].forEach(seq => {
-    const dur = getSequenceDuration(seq);
-    if (dur > totalDuration) totalDuration = dur;
-  });
+  for (const side of ['left', 'right']) {
+    for (const seq of sideData[side].sequences) {
+      const dur = getSequenceDuration(seq);
+      if (dur > totalDuration) totalDuration = dur;
+    }
+  }
 
   const slider = document.getElementById("seekSlider");
   slider.max = totalDuration;
@@ -1014,23 +910,16 @@ function rebuildAnimationPlayer() {
 }
 
 function setupGridVisualization(leftContainer, rightContainer) {
-  // Create lights for Left
-  sequencesLeft.forEach((seq, idx) => {
-    const div = document.createElement("div");
-    div.className = "light-bulb";
-    div.dataset.index = idx + 1;
-    div.id = `left_light_${idx}`;
-    leftContainer.appendChild(div);
-  });
-
-  // Create lights for Right
-  sequencesRight.forEach((seq, idx) => {
-    const div = document.createElement("div");
-    div.className = "light-bulb";
-    div.dataset.index = idx + 1;
-    div.id = `right_light_${idx}`;
-    rightContainer.appendChild(div);
-  });
+  const containers = { left: leftContainer, right: rightContainer };
+  for (const side of ['left', 'right']) {
+    sideData[side].sequences.forEach((seq, idx) => {
+      const div = document.createElement("div");
+      div.className = "light-bulb";
+      div.dataset.index = idx + 1;
+      div.id = `${side}_light_${idx}`;
+      containers[side].appendChild(div);
+    });
+  }
 }
 
 function setupImageVisualization(leftContainer, rightContainer, config) {
@@ -1133,9 +1022,6 @@ function seekAnimation(val) {
     updateVisuals(currentAnimTime);
     updateControls(currentAnimTime);
   } else {
-    // If playing, update time logic needs a reset of lastFrameTime
-    // so we don't jump. But actually we use Delta, so we just
-    // set currentAnimTime and ensure lastFrameTime is 'now' to avoid huge delta
     lastFrameTime = performance.now();
   }
 }
@@ -1168,23 +1054,15 @@ function updateControls(time) {
 }
 
 function updateVisuals(time) {
-  // Update Left
-  sequencesLeft.forEach((seq, idx) => {
-    const el = document.getElementById(`left_light_${idx}`);
-    if (el) {
-      const bri = getBrightnessAtTime(seq, time);
-      applyBrightness(el, bri);
-    }
-  });
-
-  // Update Right
-  sequencesRight.forEach((seq, idx) => {
-    const el = document.getElementById(`right_light_${idx}`);
-    if (el) {
-      const bri = getBrightnessAtTime(seq, time);
-      applyBrightness(el, bri);
-    }
-  });
+  for (const side of ['left', 'right']) {
+    sideData[side].sequences.forEach((seq, idx) => {
+      const el = document.getElementById(`${side}_light_${idx}`);
+      if (el) {
+        const bri = getBrightnessAtTime(seq, time);
+        applyBrightness(el, bri);
+      }
+    });
+  }
 }
 
 function applyBrightness(element, brightness) {
@@ -1196,10 +1074,8 @@ function applyBrightness(element, brightness) {
     if (brightness > 0) {
       const color = `rgba(255, 255, 255, ${brightness / 100})`;
       element.setAttribute("fill", color);
-      // Only set stroke if it's not focused, or handle focused in CSS with !important
       element.setAttribute("stroke", color);
 
-      // Only apply standard drop-shadow if not focused
       if (!element.classList.contains('focused')) {
         element.style.filter = `drop-shadow(0 0 ${brightness / 10}px rgba(255, 255, 255, 0.8))`;
       }
