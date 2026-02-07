@@ -550,12 +550,23 @@ function renderDynamicSequences() {
   }
 }
 
+function getChannelName(channelId) {
+  const vehicleSelect = document.getElementById("vehicleSelect");
+  if (!vehicleSelect) return null;
+  const config = VEHICLE_CONFIGS[vehicleSelect.value];
+  if (!config || !config.channels) return null;
+  const channel = config.channels.find(ch => ch.id === channelId);
+  return channel ? channel.label : null;
+}
+
 function getSeqLabel(side, seqIndex) {
   const label = side === 'left' ? 'Left' : 'Right';
   const seq = sideData[side].sequences[seqIndex];
   if (!seq) return `Ch ${label} #${seqIndex + 1}`;
   if (seq.identifier === 'RAW') return `RAW ${label}`;
   const chNum = parseInt(seq.identifier, 16);
+  const chName = getChannelName(chNum);
+  if (chName) return `${chName} — ${label} (Ch ${chNum})`;
   return `Ch ${label} ${chNum} (0x${seq.identifier.toUpperCase()})`;
 }
 
@@ -567,10 +578,15 @@ function getDiagramLabel(seqIndex) {
   if (leftId && rightId) {
     if (leftId.toUpperCase() === rightId.toUpperCase()) {
       const chNum = parseInt(leftId, 16);
+      const chName = getChannelName(chNum);
+      if (chName) return `${chName} — Diagram (Ch ${chNum})`;
       return `Diagram Ch ${chNum} (0x${leftId.toUpperCase()})`;
     }
     const lNum = parseInt(leftId, 16);
     const rNum = parseInt(rightId, 16);
+    const lName = getChannelName(lNum);
+    const rName = getChannelName(rNum);
+    if (lName && rName) return `${lName} / ${rName} — Diagram`;
     return `Diagram Ch ${lNum} (0x${leftId.toUpperCase()}) / Ch ${rNum} (0x${rightId.toUpperCase()})`;
   }
   return `Diagram #${seqIndex + 1}`;
