@@ -8,7 +8,17 @@ Advanced Welcome Light Visualizer — a client-side web tool for analyzing and e
 
 ## Running the Application
 
-No build system, dependencies, or installation. Open `index.html` directly in a browser. There are no tests, linting, or formatting tools configured.
+No build system or installation. Open `index.html` directly in a browser.
+
+### Tests
+
+Tests live in `tests/run-tests.js` and use the Node.js built-in test runner. Run with:
+
+```
+npm test
+```
+
+Tests cover: hex parsing, sequence parsing, reassembly, round-trips, string conversions, and template hex validation. All template data in `templates.js` must contain only valid two-character hex bytes (`[0-9A-Fa-f]{2}`).
 
 ## Architecture
 
