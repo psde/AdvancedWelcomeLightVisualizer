@@ -142,6 +142,7 @@ function renderHexEditor(container, side, seqIndex, seq) {
     sideData[side].sequences[seqIndex] = stringToSequence(e.target.value);
     reAssembleBytes(side);
     updateSingleDiagram(seqIndex);
+    updateSeqLabels(seqIndex);
     updateVisuals(currentAnimTime);
   };
   container.appendChild(ta);
@@ -530,7 +531,10 @@ function renderDynamicSequences() {
     chartDiv.id = `chartCanvas_${i}`;
     chartDiv.className = "chartCanvas";
     chartDiv.style.height = "250px";
-    chartDiv.textContent = `Diagram Sequence #${i + 1}`;
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'diagram-label';
+    labelSpan.textContent = getDiagramLabel(i);
+    chartDiv.appendChild(labelSpan);
     seqBlock.appendChild(chartDiv);
 
     container.appendChild(seqBlock);
@@ -543,6 +547,44 @@ function renderDynamicSequences() {
 
     // Initial p5 Sketch
     chartSketches[i] = createSingleChart(i, chartDiv);
+  }
+}
+
+function getSeqLabel(side, seqIndex) {
+  const label = side === 'left' ? 'Left' : 'Right';
+  const seq = sideData[side].sequences[seqIndex];
+  if (!seq) return `Ch ${label} #${seqIndex + 1}`;
+  if (seq.identifier === 'RAW') return `RAW ${label}`;
+  const chNum = parseInt(seq.identifier, 16);
+  return `Ch ${label} ${chNum} (0x${seq.identifier.toUpperCase()})`;
+}
+
+function getDiagramLabel(seqIndex) {
+  const leftSeq = sideData.left.sequences[seqIndex];
+  const rightSeq = sideData.right.sequences[seqIndex];
+  const leftId = leftSeq && leftSeq.identifier !== 'RAW' ? leftSeq.identifier : null;
+  const rightId = rightSeq && rightSeq.identifier !== 'RAW' ? rightSeq.identifier : null;
+  if (leftId && rightId) {
+    if (leftId.toUpperCase() === rightId.toUpperCase()) {
+      const chNum = parseInt(leftId, 16);
+      return `Diagram Ch ${chNum} (0x${leftId.toUpperCase()})`;
+    }
+    const lNum = parseInt(leftId, 16);
+    const rNum = parseInt(rightId, 16);
+    return `Diagram Ch ${lNum} (0x${leftId.toUpperCase()}) / Ch ${rNum} (0x${rightId.toUpperCase()})`;
+  }
+  return `Diagram #${seqIndex + 1}`;
+}
+
+function updateSeqLabels(seqIndex) {
+  for (const side of ['left', 'right']) {
+    const span = document.querySelector(`[data-label-side="${side}"][data-label-seq="${seqIndex}"]`);
+    if (span) span.textContent = getSeqLabel(side, seqIndex);
+  }
+  const chartDiv = document.getElementById(`chartCanvas_${seqIndex}`);
+  if (chartDiv) {
+    const labelEl = chartDiv.querySelector('.diagram-label');
+    if (labelEl) labelEl.textContent = getDiagramLabel(seqIndex);
   }
 }
 
@@ -563,7 +605,8 @@ function createSeqSubblock(side, seqIndex) {
   if (!isLeft) {
     h4.style.flexDirection = "row-reverse";
   }
-  h4.innerHTML = `<span>Seq ${label} #${seqIndex + 1}</span> <button class="mini-copy-btn" onclick="copySequence('${side}', ${seqIndex})" title="${copyTitle}">${arrow}</button>`;
+  const seqLabel = getSeqLabel(side, seqIndex);
+  h4.innerHTML = `<span data-label-side="${side}" data-label-seq="${seqIndex}">${seqLabel}</span> <button class="mini-copy-btn" onclick="copySequence('${side}', ${seqIndex})" title="${copyTitle}">${arrow}</button>`;
   sub.appendChild(h4);
 
   // Editor container with toggle
@@ -742,7 +785,7 @@ function createSingleChart(seqIndex, containerDiv) {
         sketch.line(margin, y, margin + w, y);
       }
 
-      // Helper to draw lines
+      // Helper to draw a polyline
       const drawLine = (pts, color) => {
         if (!pts || pts.length === 0) return;
         sketch.stroke(color);
@@ -757,8 +800,41 @@ function createSingleChart(seqIndex, containerDiv) {
         sketch.endShape();
       };
 
-      drawLine(leftData.points, sketch.color(0, 0, 255)); // Blue
-      drawLine(rightData.points, sketch.color(255, 0, 0)); // Red
+      // Helper to draw a single segment between two points
+      const drawSegment = (p1, p2, color) => {
+        sketch.stroke(color);
+        sketch.strokeWeight(2);
+        sketch.noFill();
+        let x1 = sketch.map(p1.t, 0, maxTime, margin, margin + w);
+        let y1 = sketch.map(p1.b, 0, 100, margin + h, margin);
+        let x2 = sketch.map(p2.t, 0, maxTime, margin, margin + w);
+        let y2 = sketch.map(p2.b, 0, 100, margin + h, margin);
+        sketch.line(x1, y1, x2, y2);
+      };
+
+      if (arePointsIdentical(leftData.points, rightData.points)) {
+        drawLine(leftData.points, sketch.color(0, 180, 0)); // Green = identical
+      } else {
+        const lp = leftData.points;
+        const rp = rightData.points;
+        const maxPts = Math.max(lp.length, rp.length);
+
+        // Draw segment-by-segment: green where both endpoints match, blue/red where they differ
+        for (let s = 0; s < maxPts - 1; s++) {
+          const lHas = s + 1 < lp.length;
+          const rHas = s + 1 < rp.length;
+          const bothMatch = lHas && rHas &&
+            lp[s].t === rp[s].t && lp[s].b === rp[s].b &&
+            lp[s + 1].t === rp[s + 1].t && lp[s + 1].b === rp[s + 1].b;
+
+          if (bothMatch) {
+            drawSegment(lp[s], lp[s + 1], sketch.color(0, 180, 0)); // Green
+          } else {
+            if (lHas) drawSegment(lp[s], lp[s + 1], sketch.color(0, 0, 255)); // Blue
+            if (rHas) drawSegment(rp[s], rp[s + 1], sketch.color(255, 0, 0)); // Red
+          }
+        }
+      }
 
       // Current Position Indicator
       if (typeof currentAnimTime !== 'undefined') {
@@ -853,6 +929,17 @@ function parseForChart(seq) {
   }
 
   return { maxT: sumT, points: pts };
+}
+
+/**
+ * Compare two arrays of {t, b} chart points for equality
+ */
+function arePointsIdentical(leftPoints, rightPoints) {
+  if (leftPoints.length !== rightPoints.length) return false;
+  for (let i = 0; i < leftPoints.length; i++) {
+    if (leftPoints[i].t !== rightPoints[i].t || leftPoints[i].b !== rightPoints[i].b) return false;
+  }
+  return true;
 }
 
 // ============================================================================
