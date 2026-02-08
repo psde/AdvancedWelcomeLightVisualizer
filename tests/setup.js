@@ -5,7 +5,7 @@ const assert = require('node:assert');
 // ============================================================================
 // DOM Stubs + Load Production Code
 // ============================================================================
-globalThis.window = { addEventListener: function() {}, onload: null };
+globalThis.window = { addEventListener: function() {}, onload: null, location: { search: '' } };
 globalThis.document = {
   getElementById: function() { return null; },
   createElement: function() { return { appendChild: function() {} }; }
@@ -16,6 +16,7 @@ globalThis.cancelAnimationFrame = function() {};
 
 // Load production code into global scope (like <script> tags)
 vm.runInThisContext(fs.readFileSync('templates.js', 'utf8'), { filename: 'templates.js' });
+vm.runInThisContext(fs.readFileSync('config.js', 'utf8'), { filename: 'config.js' });
 vm.runInThisContext(fs.readFileSync('js/core.js', 'utf8'), { filename: 'js/core.js' });
 vm.runInThisContext(fs.readFileSync('js/animation.js', 'utf8'), { filename: 'js/animation.js' });
 vm.runInThisContext(fs.readFileSync('js/chart.js', 'utf8'), { filename: 'js/chart.js' });

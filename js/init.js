@@ -59,6 +59,11 @@ function buildDynamicFields() {
   rebuildAnimationPlayer();
 }
 
+function getDefault(paramName, configValue) {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get(paramName) || configValue || "";
+}
+
 function initTemplates() {
   const select = document.getElementById('templateSelect');
   if (typeof TEMPLATES === 'undefined') {
@@ -71,6 +76,12 @@ function initTemplates() {
     option.value = key;
     option.textContent = key;
     select.appendChild(option);
+  }
+
+  const configVal = (typeof APP_CONFIG !== 'undefined') ? APP_CONFIG.defaultTemplate : "";
+  const defaultTemplate = getDefault('template', configVal);
+  if (defaultTemplate && TEMPLATES[defaultTemplate]) {
+    select.value = defaultTemplate;
   }
 }
 
@@ -87,6 +98,12 @@ function initVehicles() {
     option.value = key;
     option.textContent = VEHICLE_CONFIGS[key].name || key;
     select.appendChild(option);
+  }
+
+  const configVal = (typeof APP_CONFIG !== 'undefined') ? APP_CONFIG.defaultVehicle : "";
+  const defaultVehicle = getDefault('vehicle', configVal);
+  if (defaultVehicle && VEHICLE_CONFIGS[defaultVehicle]) {
+    select.value = defaultVehicle;
   }
 }
 
