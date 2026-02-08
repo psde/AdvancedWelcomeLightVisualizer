@@ -53,6 +53,31 @@ function setupGridVisualization(leftContainer, rightContainer) {
   }
 }
 
+function createSVGShape(shapeDesc) {
+  let el;
+  if (shapeDesc.type === "path") {
+    el = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    el.setAttribute("d", shapeDesc.d);
+  } else if (shapeDesc.type === "circle") {
+    el = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    el.setAttribute("cx", shapeDesc.cx);
+    el.setAttribute("cy", shapeDesc.cy);
+    el.setAttribute("r", shapeDesc.r);
+  } else if (shapeDesc.type === "polygon") {
+    el = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+    el.setAttribute("points", shapeDesc.points);
+  } else if (shapeDesc.type === "rect") {
+    el = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    el.setAttribute("x", shapeDesc.x);
+    el.setAttribute("y", shapeDesc.y);
+    el.setAttribute("width", shapeDesc.width);
+    el.setAttribute("height", shapeDesc.height);
+    if (shapeDesc.rx) el.setAttribute("rx", shapeDesc.rx);
+    if (shapeDesc.ry) el.setAttribute("ry", shapeDesc.ry);
+  }
+  return el;
+}
+
 function setupImageVisualization(leftContainer, rightContainer, config) {
   const createSVG = (side) => {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -72,15 +97,19 @@ function setupImageVisualization(leftContainer, rightContainer, config) {
 
     config.channels.forEach((channel, idx) => {
       let el;
-      if (channel.type === "path") {
-        el = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        el.setAttribute("d", channel.d);
-      } else if (channel.type === "circle") {
-        el = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        el.setAttribute("cx", channel.cx);
-        el.setAttribute("cy", channel.cy);
-        el.setAttribute("r", channel.r);
+
+      if (channel.shapes) {
+        // Multi-shape channel: wrap in <g> group
+        el = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        channel.shapes.forEach(shapeDesc => {
+          const child = createSVGShape(shapeDesc);
+          if (child) el.appendChild(child);
+        });
+      } else {
+        // Single-shape channel (backward compatible)
+        el = createSVGShape(channel);
       }
+
       if (el) {
         el.id = `${side}_light_${idx}`;
         el.setAttribute("fill", "transparent");
