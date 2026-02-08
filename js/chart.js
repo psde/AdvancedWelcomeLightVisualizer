@@ -221,8 +221,9 @@ function createSingleChart(seqIndex, containerDiv) {
           seekAnimation(clickedTime);
 
           // Highlight Lights
-          const leftLight = document.getElementById(`left_light_${seqIndex}`);
-          const rightLight = document.getElementById(`right_light_${seqIndex}`);
+          const seq = sideData['left'].sequences[seqIndex] || sideData['right'].sequences[seqIndex];
+          const leftLight = getLightElement('left', seq, seqIndex);
+          const rightLight = getLightElement('right', seq, seqIndex);
           if (leftLight) leftLight.classList.add('focused');
           if (rightLight) rightLight.classList.add('focused');
 
@@ -232,8 +233,9 @@ function createSingleChart(seqIndex, containerDiv) {
     };
 
     const clearInteraction = () => {
-      const leftLight = document.getElementById(`left_light_${seqIndex}`);
-      const rightLight = document.getElementById(`right_light_${seqIndex}`);
+      const seq = sideData['left'].sequences[seqIndex] || sideData['right'].sequences[seqIndex];
+      const leftLight = getLightElement('left', seq, seqIndex);
+      const rightLight = getLightElement('right', seq, seqIndex);
       if (leftLight) leftLight.classList.remove('focused');
       if (rightLight) rightLight.classList.remove('focused');
     };

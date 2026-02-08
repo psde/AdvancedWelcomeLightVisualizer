@@ -111,7 +111,7 @@ function setupImageVisualization(leftContainer, rightContainer, config) {
       }
 
       if (el) {
-        el.id = `${side}_light_${idx}`;
+        el.id = `${side}_light_ch${channel.id}`;
         el.setAttribute("fill", "transparent");
         el.setAttribute("stroke", "transparent");
         el.setAttribute("stroke-width", "2");
@@ -215,10 +215,18 @@ function updateControls(time) {
   document.getElementById("timeDisplay").textContent = `${Math.floor(time)} ms`;
 }
 
+function getLightElement(side, seq, idx) {
+  if (seq && seq.identifier !== "RAW") {
+    const el = document.getElementById(`${side}_light_ch${parseInt(seq.identifier, 16)}`);
+    if (el) return el;
+  }
+  return document.getElementById(`${side}_light_${idx}`);
+}
+
 function updateVisuals(time) {
   for (const side of ['left', 'right']) {
     sideData[side].sequences.forEach((seq, idx) => {
-      const el = document.getElementById(`${side}_light_${idx}`);
+      const el = getLightElement(side, seq, idx);
       if (el) {
         const bri = getBrightnessAtTime(seq, time);
         applyBrightness(el, bri);
