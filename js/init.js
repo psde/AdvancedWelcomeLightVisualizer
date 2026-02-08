@@ -59,6 +59,20 @@ function buildDynamicFields() {
   rebuildAnimationPlayer();
 }
 
+function updateURLParams() {
+  try {
+    const params = new URLSearchParams();
+    const vehicle = document.getElementById('vehicleSelect').value;
+    const template = document.getElementById('templateSelect').value;
+    if (vehicle) params.set('vehicle', vehicle);
+    if (template) params.set('template', template);
+    const query = params.toString();
+    history.replaceState(null, '', window.location.pathname + (query ? '?' + query : ''));
+  } catch (e) {
+    // history.replaceState may be restricted on file:// protocol
+  }
+}
+
 function getDefault(paramName, configValue) {
   const urlParams = new URLSearchParams(window.location.search);
   return urlParams.get(paramName) || configValue || "";
