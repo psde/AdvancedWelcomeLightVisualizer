@@ -20,7 +20,9 @@ function parseForChart(seq) {
   for (let i = 0; i < seq.data.length; i += 2) {
     let durHex = parseInt(seq.data[i], 16) || 0;
     let briHex = parseInt(seq.data[i + 1], 16) || 0;
-    sumT += durHex * 10; // Duration in ms (Byte-Value * 10)
+    // Real-world validation: 60fps recordings confirmed ×20 multiplier (BMW G20 2020)
+    // See timing_analysis.md for detailed analysis
+    sumT += durHex * 20; // Duration in ms (Byte-Value * 20)
     let bri = Math.min(briHex, 100); // Brigthness (0-100%)
     pts.push({ t: sumT, b: bri });
   }

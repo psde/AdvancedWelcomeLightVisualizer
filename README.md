@@ -22,17 +22,18 @@ Channel: `01`
 Length: `00, 07`  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Length in pairs of the sequence. `07` are 7 pairs of two bytes or 14 bytes in total.
 
-Sequence: `05, 32, 0A, 32, 05, 64, 0A, 64, 05, 32, 0A, 32, 05, 00`  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;First Byte is the duration and the second Byte is the brightness.  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Duration Byte to decimal and multiplied with 10 results in the time in milliseconds  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Brightness Byte to decimal is the brightness in percent  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1. `05, 32` will raise the brightness to 50% in 50ms  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2. `0A, 32` the brightness will stay at 50% for 100ms  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3. `05, 64` will raise the brightness to 100% in 50ms  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4. `0A, 64` the brightness will stay at 100% for 100ms  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5. `05, 32` will reduce the brightness to 50% in 50ms  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;6. `0A, 32` the brightness will stay at 50% for 100ms  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;7. `05, 00` will reduce the brightness to 0% in 50ms
+Sequence: `05, 32, 0A, 32, 05, 64, 0A, 64, 05, 32, 0A, 32, 05, 00`
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;First Byte is the duration and the second Byte is the brightness.
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Duration Byte to decimal and multiplied with 20 results in the time in milliseconds.
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*Validated with 60fps video recordings of BMW G20 2020 FLM2 module. See [timing_analysis.md](timing_analysis.md) for details.*
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Brightness Byte to decimal is the brightness in percent
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1. `05, 32` will raise the brightness to 50% in 100ms
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2. `0A, 32` the brightness will stay at 50% for 200ms
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3. `05, 64` will raise the brightness to 100% in 100ms
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4. `0A, 64` the brightness will stay at 100% for 200ms
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5. `05, 32` will reduce the brightness to 50% in 100ms
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;6. `0A, 32` the brightness will stay at 50% for 200ms
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;7. `05, 00` will reduce the brightness to 0% in 100ms
 
 Credits to **[sig_serg](https://g20.bimmerpost.com/forums/showpost.php?p=31850938&postcount=107)** and **[SimR](https://g20.bimmerpost.com/forums/showpost.php?p=31870641&postcount=110)** for reverse engineering and explaining this.
 

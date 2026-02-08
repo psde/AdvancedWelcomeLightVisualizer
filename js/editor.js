@@ -94,7 +94,7 @@ function renderVisualEditor(container, side, seqIndex, seq) {
       <label>Duration:</label>
       <input type="range" min="0" max="255" value="${step.duration}"
              data-side="${side}" data-seq="${seqIndex}" data-step="${stepIdx}" data-type="duration">
-      <input type="number" min="0" max="2550" step="10" value="${step.duration * 10}"
+      <input type="number" min="0" max="5100" step="20" value="${step.duration * 20}"
              data-side="${side}" data-seq="${seqIndex}" data-step="${stepIdx}" data-type="duration">
       <span class="value-display">ms</span>
     `;
@@ -132,7 +132,8 @@ function renderVisualEditor(container, side, seqIndex, seq) {
       // Update number input
       const numInput = e.target.nextElementSibling;
       if (type === 'duration') {
-        numInput.value = val * 10;
+        // Real-world validation: ×20 multiplier confirmed (BMW G20 2020)
+        numInput.value = val * 20;
       } else {
         numInput.value = val;
       }
@@ -151,8 +152,9 @@ function renderVisualEditor(container, side, seqIndex, seq) {
       // Clamp and convert to internal value
       let val;
       if (type === 'duration') {
-        inputVal = Math.max(0, Math.min(2550, inputVal));
-        val = Math.round(inputVal / 10);
+        // Real-world validation: ×20 multiplier confirmed (BMW G20 2020)
+        inputVal = Math.max(0, Math.min(5100, inputVal));
+        val = Math.round(inputVal / 20);
       } else {
         val = Math.max(0, Math.min(100, inputVal));
       }

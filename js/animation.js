@@ -106,7 +106,9 @@ function getSequenceDuration(seq) {
   let t = 0;
   for (let i = 0; i < seq.data.length; i += 2) {
     let durHex = parseInt(seq.data[i], 16) || 0;
-    t += durHex * 10;
+    // Real-world validation: 60fps recordings confirmed ×20 multiplier (BMW G20 2020)
+    // See timing_analysis.md for detailed analysis
+    t += durHex * 20;
   }
   return t;
 }
@@ -240,7 +242,9 @@ function getBrightnessAtTime(seq, timeObj) {
   for (let i = 0; i < seq.data.length; i += 2) {
     let durHex = parseInt(seq.data[i], 16) || 0;
     let briHex = parseInt(seq.data[i + 1], 16) || 0;
-    let stepDur = durHex * 10;
+    // Real-world validation: 60fps recordings confirmed ×20 multiplier (BMW G20 2020)
+    // See timing_analysis.md for detailed analysis
+    let stepDur = durHex * 20;
     let bEnd = Math.min(briHex, 100);
     let tEnd = tStart + stepDur;
 
