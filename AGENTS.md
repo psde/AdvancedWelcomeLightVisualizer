@@ -23,6 +23,7 @@ Test files live in `tests/`:
 - **`tests/core.test.js`** — Core data logic: hex parsing, sequence parsing, reassembly, round-trips, string conversions, edge cases.
 - **`tests/chart.test.js`** — Chart/diagram tests: `arePointsIdentical`, `parseForChart`.
 - **`tests/templates.test.js`** — Template hex byte validation (all templates x 4 fields).
+- **`tests/vehicles.test.js`** — Vehicle config structure validation (channel shapes, required attributes).
 
 All template data in `templates.js` must contain only valid two-character hex bytes (`[0-9A-Fa-f]{2}`).
 
@@ -32,13 +33,13 @@ All template data in `templates.js` must contain only valid two-character hex by
 
 - **`index.html`** — HTML structure, loads external scripts and stylesheet.
 - **`js/core.js`** — Data model, constants (`MAX_STAGING1`, `MAX_STAGING2`), byte parsing (`parseByteString`, `buildByteString`), sequence parsing (`parseAllSequencesFromBytes`), reassembly (`reAssembleBytes`), string conversion (`sequenceToString`, `stringToSequence`).
-- **`js/animation.js`** — Animation player: playback state, `rebuildAnimationPlayer()`, grid/image visualization, brightness interpolation (`getBrightnessAtTime`), playback controls.
+- **`js/animation.js`** — Animation player: playback state, `rebuildAnimationPlayer()`, grid/image visualization, `createSVGShape()` (path/circle/polygon/rect), `getLightElement()`, brightness interpolation (`getBrightnessAtTime`), playback controls.
 - **`js/chart.js`** — p5.js brightness diagrams: `chartSketches`, `parseForChart()`, `arePointsIdentical()`, `createSingleChart()`, `updateSingleDiagram()`.
 - **`js/editor.js`** — Sequence editors: hex/visual editor rendering, step manipulation, `renderDynamicSequences()`, `createSeqSubblock()`, channel labeling.
 - **`js/init.js`** — Initialization: clipboard helpers, `buildDynamicFields()`, template/vehicle loading, `DOMContentLoaded`/`window.onload` handlers.
 - **`styles.css`** — All CSS styles for the application.
 - **`templates.js`** — Generated file containing `TEMPLATES` constant with pre-defined animation data for various BMW models (hex byte strings).
-- **`vehicles.js`** — `VEHICLE_CONFIGS` defining vehicle models, visualization types ("grid" or "image"), and light channel mappings (ID, SVG shape type, position, label).
+- **`vehicles.js`** — `VEHICLE_CONFIGS` defining vehicle models, visualization types ("grid" or "image"), and light channel mappings (ID, SVG shape type, position, label). Channels use direct shape properties (`type` + attrs) or a `shapes` array for multi-shape channels. Supported shape types: `path`, `circle`, `polygon`, `rect`.
 - **`parse_templates.py`** — Python script that parses `Templates/` directory files (FLM2 Left/Right, Staging1/Staging2 sections) into `templates.js`.
 - **`Templates/`** — Raw template text files per BMW model variant.
 - **`assets/generic_light.png`** — Vehicle image used for SVG overlay visualization.
@@ -78,6 +79,7 @@ Key global state: `sideData.left.staging1Bytes`, `sideData.left.staging2Bytes`, 
 - Diagrams use left=blue, right=red, identical=green color coding.
 - The visual editor uses sliders for duration/brightness per step; hex editor uses raw textarea.
 - Sequences terminate when `00, 00, 00` is encountered during parsing.
+- Animation light element IDs: image mode uses `${side}_light_ch${channel.id}` (matched by channel ID from sequence identifier), grid mode uses `${side}_light_${idx}` (matched by sequence index).
 - Licensed under CC BY-NC-SA 4.0.
 
 ## Workflow
