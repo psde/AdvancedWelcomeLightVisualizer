@@ -12,20 +12,30 @@ No build system or installation. Open `index.html` directly in a browser.
 
 ### Tests
 
-Tests live in `tests/run-tests.js` and use the Node.js built-in test runner. Run with:
+Tests use the Node.js built-in test runner. Run with:
 
 ```
 npm test
 ```
 
-Tests cover: hex parsing, sequence parsing, reassembly, round-trips, string conversions, and template hex validation. All template data in `templates.js` must contain only valid two-character hex bytes (`[0-9A-Fa-f]{2}`).
+Test files live in `tests/`:
+- **`tests/setup.js`** — Shared DOM stubs, loads all production code via `vm.runInThisContext`, exports `assertHexArrayEqual` helper.
+- **`tests/core.test.js`** — Core data logic: hex parsing, sequence parsing, reassembly, round-trips, string conversions, edge cases.
+- **`tests/chart.test.js`** — Chart/diagram tests: `arePointsIdentical`, `parseForChart`.
+- **`tests/templates.test.js`** — Template hex byte validation (all templates x 4 fields).
+
+All template data in `templates.js` must contain only valid two-character hex bytes (`[0-9A-Fa-f]{2}`).
 
 ## Architecture
 
 ### File Layout
 
 - **`index.html`** — HTML structure, loads external scripts and stylesheet.
-- **`app.js`** — All application logic: parsing, editing, diagrams, animation player.
+- **`js/core.js`** — Data model, constants (`MAX_STAGING1`, `MAX_STAGING2`), byte parsing (`parseByteString`, `buildByteString`), sequence parsing (`parseAllSequencesFromBytes`), reassembly (`reAssembleBytes`), string conversion (`sequenceToString`, `stringToSequence`).
+- **`js/animation.js`** — Animation player: playback state, `rebuildAnimationPlayer()`, grid/image visualization, brightness interpolation (`getBrightnessAtTime`), playback controls.
+- **`js/chart.js`** — p5.js brightness diagrams: `chartSketches`, `parseForChart()`, `arePointsIdentical()`, `createSingleChart()`, `updateSingleDiagram()`.
+- **`js/editor.js`** — Sequence editors: hex/visual editor rendering, step manipulation, `renderDynamicSequences()`, `createSeqSubblock()`, channel labeling.
+- **`js/init.js`** — Initialization: clipboard helpers, `buildDynamicFields()`, template/vehicle loading, `DOMContentLoaded`/`window.onload` handlers.
 - **`styles.css`** — All CSS styles for the application.
 - **`templates.js`** — Generated file containing `TEMPLATES` constant with pre-defined animation data for various BMW models (hex byte strings).
 - **`vehicles.js`** — `VEHICLE_CONFIGS` defining vehicle models, visualization types ("grid" or "image"), and light channel mappings (ID, SVG shape type, position, label).
@@ -64,7 +74,7 @@ Key global state: `sideData.left.staging1Bytes`, `sideData.left.staging2Bytes`, 
 
 ## Key Conventions
 
-- All application logic lives in `app.js` (loaded via `<script>` in `index.html`) — there are no modules or bundling.
+- Application logic is split across files in `js/` (loaded via `<script>` tags in `index.html`, order matters) — there are no modules or bundling.
 - Diagrams use left=blue, right=red, identical=green color coding.
 - The visual editor uses sliders for duration/brightness per step; hex editor uses raw textarea.
 - Sequences terminate when `00, 00, 00` is encountered during parsing.
@@ -72,4 +82,5 @@ Key global state: `sideData.left.staging1Bytes`, `sideData.left.staging2Bytes`, 
 
 ## Workflow
 
+- Always run `npm test` before starting work to confirm a clean baseline.
 - After UI changes, use AskUserQuestion to ask the user to verify the result in the browser (there is no automated browser testing).
