@@ -39,7 +39,7 @@ All template data in `templates.js` must contain only valid two-character hex by
 - **`js/init.js`** — Initialization: clipboard helpers, `buildDynamicFields()`, template/vehicle loading, `DOMContentLoaded`/`window.onload` handlers.
 - **`styles.css`** — All CSS styles for the application.
 - **`templates.js`** — Generated file containing `TEMPLATES` constant with pre-defined animation data for various BMW models (hex byte strings).
-- **`vehicles.js`** — `VEHICLE_CONFIGS` defining vehicle models, visualization types ("grid" or "image"), and light channel mappings (ID, SVG shape type, position, label). Channels use direct shape properties (`type` + attrs) or a `shapes` array for multi-shape channels. Supported shape types: `path`, `circle`, `polygon`, `rect`.
+- **`vehicles.js`** — `VEHICLE_CONFIGS` defining vehicle models, visualization types ("grid" or "image"), and light channel mappings (ID, SVG shape type, position, label). Channels use direct shape properties (`type` + attrs) or a `shapes` array for multi-shape channels. Supported shape types: `path`, `circle`, `polygon`, `rect`. Shapes support an optional `color` attribute (hex string `#RRGGBB` or `#RRGGBBAA`) to override the default white; brightness modulates the color's alpha during animation.
 - **`parse_templates.py`** — Python script that parses `Templates/` directory files (FLM2 Left/Right, Staging1/Staging2 sections) into `templates.js`.
 - **`Templates/`** — Raw template text files per BMW model variant.
 - **`assets/generic_light.png`** — Vehicle image used for SVG overlay visualization.
@@ -54,7 +54,7 @@ Format: [channel_id] [00] [length] [duration, brightness, duration, brightness, 
 
 - **channel_id**: identifies which light (DRL, beam, accent, etc.)
 - **length**: number of duration/brightness pairs
-- **duration**: hex byte × 10 = milliseconds
+- **duration**: hex byte × 20 = milliseconds
 - **brightness**: hex byte = percentage (0x00–0x64 → 0–100%)
 - **Staging1_Data**: first 252 bytes, **Staging2_Data**: additional 168 bytes (420 total per side)
 

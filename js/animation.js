@@ -75,7 +75,26 @@ function createSVGShape(shapeDesc) {
     if (shapeDesc.rx) el.setAttribute("rx", shapeDesc.rx);
     if (shapeDesc.ry) el.setAttribute("ry", shapeDesc.ry);
   }
+  if (el && shapeDesc.color) {
+    el.setAttribute("data-color", shapeDesc.color);
+  }
   return el;
+}
+
+function parseHexColor(hex) {
+  hex = hex.replace('#', '');
+  let r, g, b, a = 1;
+  if (hex.length === 6) {
+    r = parseInt(hex.slice(0, 2), 16);
+    g = parseInt(hex.slice(2, 4), 16);
+    b = parseInt(hex.slice(4, 6), 16);
+  } else if (hex.length === 8) {
+    r = parseInt(hex.slice(0, 2), 16);
+    g = parseInt(hex.slice(2, 4), 16);
+    b = parseInt(hex.slice(4, 6), 16);
+    a = parseInt(hex.slice(6, 8), 16) / 255;
+  }
+  return { r: r || 0, g: g || 0, b: b || 0, a };
 }
 
 function setupImageVisualization(leftContainer, rightContainer, config) {
@@ -240,18 +259,35 @@ function applyBrightness(element, brightness) {
   const val = Math.round((brightness / 100) * 255);
 
   if (isSVG) {
-    // SVG styling
+    // Get individual shapes: children of <g>, or the element itself
+    const isGroup = element.tagName === 'g';
+    const shapes = isGroup
+      ? Array.from(element.children).filter(c => c.tagName !== 'title')
+      : [element];
+
     if (brightness > 0) {
-      const color = `rgba(255, 255, 255, ${brightness / 100})`;
-      element.setAttribute("fill", color);
-      element.setAttribute("stroke", color);
+      const defaultColor = `rgba(255, 255, 255, ${brightness / 100})`;
+      for (const shape of shapes) {
+        const baseColor = shape.getAttribute('data-color');
+        let color;
+        if (baseColor) {
+          const { r, g, b, a } = parseHexColor(baseColor);
+          color = `rgba(${r}, ${g}, ${b}, ${(brightness / 100) * a})`;
+        } else {
+          color = defaultColor;
+        }
+        shape.setAttribute("fill", color);
+        shape.setAttribute("stroke", color);
+      }
 
       if (!element.classList.contains('focused')) {
         element.style.filter = `drop-shadow(0 0 ${brightness / 10}px rgba(255, 255, 255, 0.8))`;
       }
     } else {
-      element.setAttribute("fill", "transparent");
-      element.setAttribute("stroke", "transparent");
+      for (const shape of shapes) {
+        shape.setAttribute("fill", "transparent");
+        shape.setAttribute("stroke", "transparent");
+      }
       if (!element.classList.contains('focused')) {
         element.style.filter = "none";
       }

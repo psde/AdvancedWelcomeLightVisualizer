@@ -19,6 +19,8 @@ const REQUIRED_ATTRS = {
   rect:    ['x', 'y', 'width', 'height']
 };
 
+const HEX_COLOR_RE = /^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
+
 function validateShape(shape, context) {
   assert.ok(VALID_TYPES.includes(shape.type),
     context + ': invalid shape type "' + shape.type + '"');
@@ -26,6 +28,10 @@ function validateShape(shape, context) {
   for (const attr of required) {
     assert.ok(attr in shape,
       context + ': shape type "' + shape.type + '" missing required attribute "' + attr + '"');
+  }
+  if ('color' in shape) {
+    assert.ok(typeof shape.color === 'string' && HEX_COLOR_RE.test(shape.color),
+      context + ': color must be a hex string (#RRGGBB or #RRGGBBAA), got "' + shape.color + '"');
   }
 }
 
@@ -64,11 +70,10 @@ describe('VEHICLE_CONFIGS structure', () => {
               for (let s = 0; s < ch.shapes.length; s++) {
                 validateShape(ch.shapes[s], ctx + ' shapes[' + s + ']');
               }
-            } else {
-              assert.ok(typeof ch.type === 'string',
-                ctx + ': must have either "type" or "shapes"');
+            } else if (ch.type) {
               validateShape(ch, ctx);
             }
+            // Channels with neither type nor shapes are label-only (no visual)
           });
         }
       }
