@@ -7,6 +7,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
   <script src="templates.js"></script>
   <script src="vehicles.js"></script>
+  <script src="config.js"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 
@@ -16,13 +17,13 @@
   <div style="margin-bottom: 20px; text-align: center; display: flex; justify-content: center; gap: 20px;">
     <div>
       <label for="templateSelect" style="display: inline-block; margin-right: 10px;">Load Template:</label>
-      <select id="templateSelect" onchange="loadSelectedTemplate()">
+      <select id="templateSelect" onchange="loadSelectedTemplate(); updateURLParams()">
         <option value="">-- Select a Template --</option>
       </select>
     </div>
     <div>
       <label for="vehicleSelect" style="display: inline-block; margin-right: 10px;">Vehicle Model:</label>
-      <select id="vehicleSelect" onchange="buildDynamicFields()">
+      <select id="vehicleSelect" onchange="buildDynamicFields(); updateURLParams()">
         <!-- Populated dynamically -->
       </select>
     </div>
@@ -84,6 +85,7 @@
         <option value="0.5">0.5x</option>
         <option value="1" selected>1.0x</option>
         <option value="1.5">1.5x</option>
+        <option value="2">2.0x</option>
       </select>
 
       <span class="time-display" id="timeDisplay">0 ms</span>
@@ -108,7 +110,11 @@
     <!-- Dynamic Sequences + Diagrams -->
   </div>
 
-  <script src="app.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/animation.js"></script>
+  <script src="js/chart.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/init.js"></script>
 </body>
 
 </html>
