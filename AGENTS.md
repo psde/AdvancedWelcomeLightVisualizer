@@ -82,7 +82,45 @@ Key global state: `sideData.left.staging1Bytes`, `sideData.left.staging2Bytes`, 
 - Animation light element IDs: image mode uses `${side}_light_ch${channel.id}` (matched by channel ID from sequence identifier), grid mode uses `${side}_light_${idx}` (matched by sequence index).
 - Licensed under CC BY-NC-SA 4.0.
 
+## Code Style
+
+### Self-documenting code / Comments policy
+- Write self-documenting code: descriptive function names, clear variable names, obvious structure
+- No comments that restate what the code does (e.g. `// Parse bytes` before `parseBytes()`)
+- Comments ARE required for: non-obvious business logic, edge cases, real-world validation references (e.g. BMW timing multiplier), and critical invariants
+- In functions >~20 lines with 2+ distinct logical blocks, use brief section comments (2-4 words) to label each block. DOM/HTML construction code especially benefits from these since `createElement`/`setAttribute` chains are visually dense.
+- Remove commented-out code entirely; use git history instead
+
+### Naming conventions
+- `camelCase` for all JS variables, functions, and parameters
+- No single-letter variables except loop counters in tiny scopes (`i`, `j`)
+- No cryptic abbreviations (`s`, `si`, `sti`, `ta`, `pts`, `sd`) — spell out (`side`, `seqIndex`, `stepIndex`, `textarea`, `points`, `sideDataEntry`)
+- String constants used more than twice should be named constants (e.g. `"RAW"` → `RAW_IDENTIFIER`)
+
+### Variable declarations
+- Use `const` by default; `let` only when reassignment is needed; never `var`
+- Prefer `const` for object/array bindings even if contents are mutated
+
+### Functions
+- Top-level named functions use `function` declarations
+- Inline callbacks and short helpers use arrow functions
+- Functions over ~60 lines should be broken into smaller focused functions
+
+### CSS/HTML
+- No inline styles in HTML — use CSS classes
+- Use hex colors consistently (not `rgb()`)
+- Left=blue (`#0000ff`), Right=red (`#ff0000`) color convention
+
 ## Workflow
 
 - Always run `npm test` before starting work to confirm a clean baseline.
 - After UI changes, use AskUserQuestion to ask the user to verify the result in the browser (there is no automated browser testing).
+
+## Known Technical Debt
+
+- **Duplicate logic**: `getPhysicalLightBrightness` & `getPhysicalLightSource` in animation.js (~95 lines duplicated) — extract shared phase-finding logic
+- **Massive functions**: `createSingleChart` (197 lines) and `createSummaryChart` (218 lines) in chart.js with ~90% shared p5 scaffold — extract chart factory
+- **Duplicate init functions**: `initTemplates` / `initVehicles` in init.js are nearly identical — extract generic `initializeSelect()`
+- **Global state encapsulation**: 7 mutable animation globals, `editModes`, `chartSketches` — consider wrapping in objects/closures
+- **Redundant `buildDynamicFields()` call** in `window.onload` (already called by `loadSelectedTemplate`)
+- **core.js `hasContent` check**: `b !== "0"` condition is unreachable — should be just `b !== "00"`

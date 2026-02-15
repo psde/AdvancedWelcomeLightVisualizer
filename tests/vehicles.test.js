@@ -75,8 +75,74 @@ describe('VEHICLE_CONFIGS structure', () => {
             }
             // Channels with neither type nor shapes are label-only (no visual)
           });
+
+          if (ch.physicalLight !== undefined) {
+            it('should have valid physicalLight reference for ' + ctx, () => {
+              assert.ok(typeof ch.physicalLight === 'number',
+                ctx + ': physicalLight must be a number');
+              const target = config.channels.find(c => c.id === ch.physicalLight);
+              assert.ok(target, ctx + ': physicalLight references non-existent channel ' + ch.physicalLight);
+              assert.ok(target.shapes || target.type,
+                ctx + ': physicalLight references channel without shapes');
+            });
+          }
         }
+      }
+
+      if (config.phases) {
+        it('should have valid phases array', () => {
+          assert.ok(Array.isArray(config.phases), key + ': phases must be an array');
+          assert.ok(config.phases.length > 0, key + ': phases array is empty');
+          for (let pi = 0; pi < config.phases.length; pi++) {
+            const phase = config.phases[pi];
+            const pctx = key + ' phases[' + pi + ']';
+            assert.ok(typeof phase.name === 'string' && phase.name.length > 0,
+              pctx + ': missing or empty name');
+            assert.ok(Array.isArray(phase.channels) && phase.channels.length > 0,
+              pctx + ': channels must be a non-empty array');
+            for (const chId of phase.channels) {
+              assert.ok(typeof chId === 'number', pctx + ': channel id must be a number');
+            }
+            if (phase.maxDuration !== null && phase.maxDuration !== undefined) {
+              assert.ok(typeof phase.maxDuration === 'number' && phase.maxDuration >= 0,
+                pctx + ': maxDuration must be a non-negative number or null');
+            }
+            if (phase.anchor !== undefined) {
+              assert.ok(typeof phase.anchor === 'number' && phase.anchor >= 0,
+                pctx + ': anchor must be a non-negative number');
+            }
+          }
+        });
+      }
+
+      if (config.defaultStates) {
+        it('should have valid defaultStates', () => {
+          for (const [chIdStr, state] of Object.entries(config.defaultStates)) {
+            const dctx = key + ' defaultStates[' + chIdStr + ']';
+            assert.ok(typeof state.brightness === 'number',
+              dctx + ': brightness must be a number');
+            assert.ok(state.brightness >= 0 && state.brightness <= 100,
+              dctx + ': brightness must be 0-100');
+            if (state.rampUp !== undefined) {
+              assert.ok(typeof state.rampUp === 'number' && state.rampUp >= 0,
+                dctx + ': rampUp must be non-negative');
+            }
+            if (state.rampDown !== undefined) {
+              assert.ok(typeof state.rampDown === 'number' && state.rampDown >= 0,
+                dctx + ': rampDown must be non-negative');
+            }
+          }
+        });
       }
     });
   }
+});
+
+describe('generic vehicle has no phases', () => {
+  it('should not have phases property', () => {
+    assert.strictEqual(VEHICLE_CONFIGS.generic.phases, undefined);
+  });
+  it('should not have defaultStates property', () => {
+    assert.strictEqual(VEHICLE_CONFIGS.generic.defaultStates, undefined);
+  });
 });

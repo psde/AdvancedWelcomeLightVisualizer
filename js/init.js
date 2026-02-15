@@ -1,7 +1,3 @@
-// ============================================================================
-// Init: Initialization, templates, clipboard
-// ============================================================================
-
 function copyToClipboard(fieldId) {
   const text = document.getElementById(fieldId).value;
   navigator.clipboard.writeText(text)
@@ -32,29 +28,31 @@ function clearAllFields() {
 }
 
 function buildDynamicFields() {
+  // Parse input fields into byte arrays and sequences
   for (const side of ['left', 'right']) {
-    const sd = sideData[side];
+    const entry = sideData[side];
 
-    // Read the main input fields
     const s1 = document.getElementById(`${side}Staging1`).value;
     const s2 = document.getElementById(`${side}Staging2`).value;
 
-    // Parse into byte arrays
-    sd.staging1Bytes = parseByteString(s1);
-    sd.staging2Bytes = parseByteString(s2);
+    entry.staging1Bytes = parseByteString(s1);
+    entry.staging2Bytes = parseByteString(s2);
 
-    // Check length
-    ensureMaxSize(sd.staging1Bytes, MAX_STAGING1);
-    ensureMaxSize(sd.staging2Bytes, MAX_STAGING2);
+    ensureMaxSize(entry.staging1Bytes, MAX_STAGING1);
+    ensureMaxSize(entry.staging2Bytes, MAX_STAGING2);
 
-    // Extract sequences
-    sd.sequences = parseAllSequencesFromBytes(sd.staging1Bytes, sd.staging2Bytes);
-
-    // Update UI counters (excluding padding)
-    updateUsageUI(side, calculateSeqsSize(sd.sequences));
+    entry.sequences = parseAllSequencesFromBytes(entry.staging1Bytes, entry.staging2Bytes);
+    updateUsageUI(side, calculateSeqsSize(entry.sequences));
   }
 
-  // Create dynamic fields
+  // Compute phase timeline and render
+  const vehicleKey = document.getElementById("vehicleSelect").value;
+  const config = VEHICLE_CONFIGS[vehicleKey] || VEHICLE_CONFIGS["generic"];
+  currentPhaseTimeline = computePhaseTimeline(config, {
+    left: sideData.left.sequences,
+    right: sideData.right.sequences
+  });
+
   renderDynamicSequences();
   rebuildAnimationPlayer();
 }
@@ -69,7 +67,7 @@ function updateURLParams() {
     const query = params.toString();
     history.replaceState(null, '', window.location.pathname + (query ? '?' + query : ''));
   } catch (e) {
-    // history.replaceState may be restricted on file:// protocol
+    // replaceState may be restricted on file:// protocol
   }
 }
 
@@ -129,20 +127,16 @@ function loadSelectedTemplate() {
 
   const data = TEMPLATES[key];
 
-  // Update inputs
   document.getElementById('leftStaging1').value = data.left1 || "";
   document.getElementById('leftStaging2').value = data.left2 || "";
   document.getElementById('rightStaging1').value = data.right1 || "";
   document.getElementById('rightStaging2').value = data.right2 || "";
 
-  // Automatically parse and build
   buildDynamicFields();
 }
 
-// Initialize templates on load
 window.addEventListener('DOMContentLoaded', initTemplates);
 
-// Initialize on load
 window.onload = () => {
   initVehicles();
   loadSelectedTemplate();

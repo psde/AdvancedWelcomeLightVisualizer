@@ -6,7 +6,6 @@ body {
   padding: 10px;
   background-color: #e0e0e0;
   max-width: 1400px;
-  /* Increased max-width */
   margin: 0 auto;
 }
 
@@ -25,7 +24,6 @@ body {
   padding: 15px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   width: 48%;
-  /* Almost half width */
   box-sizing: border-box;
 }
 
@@ -113,6 +111,13 @@ button {
   margin-top: 0;
   margin-bottom: 5px;
   font-size: 1em;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.seq-subblock-right h4 {
+  flex-direction: row-reverse;
 }
 
 .seq-subblock textarea {
@@ -143,9 +148,8 @@ button {
   border: 1px solid #ccc;
   background-color: #fff;
   width: 100%;
-  /* Full width */
+  height: 250px;
   flex-basis: 100%;
-  /* Force new row in flex wrap */
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
@@ -170,17 +174,14 @@ button {
   border-bottom: 4px solid #0056b3;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   padding: 5px 15px;
-  /* Reduced padding */
 }
 
 .animation-player.sticky h3 {
   display: none;
-  /* Hide title when sticky to save space */
 }
 
 .animation-player.sticky .controls {
   margin-bottom: 5px;
-  /* Compact controls */
 }
 
 .controls {
@@ -196,13 +197,10 @@ button {
   display: flex;
   flex-direction: row;
   gap: 40px;
-  /* Increased gap for separation */
   justify-content: center;
   width: fit-content;
-  /* Fit content to make background look nice */
   padding: 15px 20px;
   background-color: #111;
-  /* Dark background */
   border-radius: 10px;
   border: 1px solid #444;
   margin-top: 10px;
@@ -212,7 +210,6 @@ button {
 .animation-player.sticky .lights-container {
   margin-top: 5px;
   padding: 5px 10px;
-  /* Compact lights container when sticky */
 }
 
 .light-group {
@@ -230,7 +227,6 @@ button {
 
 .light-group h4 {
   color: #fff;
-  /* White text on dark bg */
   min-width: 20px;
   margin: 0;
   font-weight: bold;
@@ -242,22 +238,17 @@ button {
   flex-wrap: wrap;
   gap: 5px;
   justify-content: flex-end;
-  /* Left lights stick to the right (center) */
 }
 
-/* Right lights mirrored, so they should stick to the left (center) */
+/* Right lights mirrored — row-reverse makes flex-end align to the left (center) */
 #rightLights {
+  flex-direction: row-reverse;
   justify-content: flex-end;
-  /* row-reverse makes flex-end aligned to the left side */
 }
 
-/* Left lights: standard row. We want them aligned to the right (closest to center). */
 #leftLights {
   justify-content: flex-end;
 }
-
-/* Override for specific IDs if needed, but flex-direction row-reverse handles the mirroring.
-   However, we want the grid to be responsive. */
 
 .light-bulb {
   width: 30px;
@@ -292,7 +283,6 @@ svg .focused {
   left: 50%;
   transform: translate(-50%, -50%);
   color: #666;
-  /* dark gray when off */
   font-size: 10px;
   pointer-events: none;
   z-index: 2;
@@ -301,7 +291,6 @@ svg .focused {
 input[type=range] {
   flex-grow: 1;
   min-width: 200px;
-  /* Ensure it has some base width */
 }
 
 /* Visual Editor Styles */
@@ -430,7 +419,6 @@ input[type=range] {
   background-color: #218838;
 }
 
-/* Overflow and Warning Styles */
 .overflow-error {
   color: #dc3545 !important;
   font-weight: bold;
@@ -445,10 +433,89 @@ textarea.overflow-error {
   font-size: 11px;
   font-weight: bold;
   color: #333;
-  /* Darker for better visibility */
   background: #eee;
   padding: 1px 4px;
   border-radius: 3px;
   margin-left: 10px;
   border: 1px solid #ccc;
+}
+
+.phase-timing-bar {
+  background: #f0e8e0;
+  border: 1px solid #d4c4b0;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 15px;
+  font-size: 12px;
+  font-family: monospace;
+  color: #5a3e28;
+}
+
+.summary-charts-section {
+  border: 2px solid #d4c4b0;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 20px;
+  background: #faf6f1;
+}
+
+.summary-charts-section h3 {
+  color: #5a3e28;
+  font-size: 14px;
+}
+
+.cap-warning {
+  color: #c44;
+  font-size: 11px;
+  font-weight: normal;
+  margin-left: 8px;
+}
+
+.selector-row {
+  margin-bottom: 20px;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.selector-label {
+  display: inline-block;
+  margin-right: 10px;
+}
+
+.action-buttons {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.speed-label {
+  margin-left: 10px;
+}
+
+.side-label-left {
+  color: #0000ff;
+}
+
+.side-label-right {
+  color: #ff0000;
+}
+
+.hex-editor {
+  width: 100%;
+  height: 60px;
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.sticky-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  cursor: pointer;
+}
+
+.summary-header {
+  margin: 10px 0 5px;
 }

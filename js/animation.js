@@ -1,12 +1,10 @@
-// ============================================================================
-// Animation: Playback, visualization, brightness interpolation
-// ============================================================================
 let animationId = null;
 let isPlaying = false;
 let lastFrameTime = 0;
 let currentAnimTime = 0;
 let totalDuration = 0;
 let playbackSpeed = 1.0;
+let currentPhaseTimeline = null;
 
 function rebuildAnimationPlayer() {
   const leftContainer = document.getElementById("leftLights");
@@ -23,12 +21,20 @@ function rebuildAnimationPlayer() {
     setupGridVisualization(leftContainer, rightContainer);
   }
 
-  // Calculate total duration (max of all sequences)
-  totalDuration = 0;
-  for (const side of ['left', 'right']) {
-    for (const seq of sideData[side].sequences) {
-      const dur = getSequenceDuration(seq);
-      if (dur > totalDuration) totalDuration = dur;
+  currentPhaseTimeline = computePhaseTimeline(config, {
+    left: sideData.left.sequences,
+    right: sideData.right.sequences
+  });
+
+  if (currentPhaseTimeline) {
+    totalDuration = currentPhaseTimeline.totalDuration;
+  } else {
+    totalDuration = 0;
+    for (const side of ['left', 'right']) {
+      for (const seq of sideData[side].sequences) {
+        const dur = getSequenceDuration(seq);
+        if (dur > totalDuration) totalDuration = dur;
+      }
     }
   }
 
@@ -101,31 +107,33 @@ function setupImageVisualization(leftContainer, rightContainer, config) {
   const createSVG = (side) => {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("viewBox", config.viewBox);
-    svg.style.width = "450px"; // Slightly larger
+    // SVG container with background vehicle image
+    svg.style.width = "450px";
     svg.style.height = "auto";
     svg.style.backgroundImage = `url('${config.image}')`;
     svg.style.backgroundSize = "cover";
     svg.style.borderRadius = "8px";
     svg.style.border = "1px solid #333";
 
-    // Mirroring logic based on baseSide
+    // Mirror non-base side horizontally
     const baseSide = config.baseSide || "left";
     if (side !== baseSide) {
-      svg.style.transform = "scaleX(-1)"; // Mirror the side that is not the base side
+      svg.style.transform = "scaleX(-1)";
     }
 
+    // Create SVG shapes for each light channel
     config.channels.forEach((channel, idx) => {
+      if (channel.physicalLight) return;
+
       let el;
 
       if (channel.shapes) {
-        // Multi-shape channel: wrap in <g> group
         el = document.createElementNS("http://www.w3.org/2000/svg", "g");
         channel.shapes.forEach(shapeDesc => {
           const child = createSVGShape(shapeDesc);
           if (child) el.appendChild(child);
         });
-      } else {
-        // Single-shape channel (backward compatible)
+      } else if (channel.type) {
         el = createSVGShape(channel);
       }
 
@@ -135,7 +143,6 @@ function setupImageVisualization(leftContainer, rightContainer, config) {
         el.setAttribute("stroke", "transparent");
         el.setAttribute("stroke-width", "2");
         el.style.transition = "all 0.1s ease";
-        // Add title for hover info
         const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
         title.textContent = channel.label || `Channel ${idx + 1}`;
         el.appendChild(title);
@@ -147,18 +154,6 @@ function setupImageVisualization(leftContainer, rightContainer, config) {
 
   leftContainer.appendChild(createSVG("left"));
   rightContainer.appendChild(createSVG("right"));
-}
-
-function getSequenceDuration(seq) {
-  if (!seq || seq.identifier === "RAW") return 0;
-  let t = 0;
-  for (let i = 0; i < seq.data.length; i += 2) {
-    let durHex = parseInt(seq.data[i], 16) || 0;
-    // Real-world validation: 60fps recordings confirmed ×20 multiplier (BMW G20 2020)
-    // See timing_analysis.md for detailed analysis
-    t += durHex * 20;
-  }
-  return t;
 }
 
 function changeSpeed(val) {
@@ -175,7 +170,6 @@ function togglePlay() {
 
 function startAnimation() {
   if (isPlaying) return;
-  // If at end, restart
   if (currentAnimTime >= totalDuration && totalDuration > 0) {
     currentAnimTime = 0;
   }
@@ -242,15 +236,220 @@ function getLightElement(side, seq, idx) {
   return document.getElementById(`${side}_light_${idx}`);
 }
 
-function updateVisuals(time) {
-  for (const side of ['left', 'right']) {
-    sideData[side].sequences.forEach((seq, idx) => {
-      const el = getLightElement(side, seq, idx);
-      if (el) {
-        const bri = getBrightnessAtTime(seq, time);
-        applyBrightness(el, bri);
+function findSequenceByChannelId(side, channelId) {
+  const chHex = channelId.toString(16).padStart(2, "0").toUpperCase();
+  for (const seq of sideData[side].sequences) {
+    if (seq && seq.identifier && seq.identifier.toUpperCase() === chHex) return seq;
+  }
+  return null;
+}
+
+function getPhysicalLightBrightness(physicalChId, time, side, config) {
+  if (!currentPhaseTimeline) return 0;
+
+  const timeline = currentPhaseTimeline;
+  const defaults = config.defaultStates || {};
+
+  // Gather all channels controlling this physical light, sorted by phase
+  const controllingChannels = [physicalChId];
+  for (const ch of config.channels) {
+    if (ch.physicalLight === physicalChId) {
+      controllingChannels.push(ch.id);
+    }
+  }
+
+  controllingChannels.sort((a, b) => {
+    const phaseA = timeline.channelPhaseMap[a] !== undefined ? timeline.channelPhaseMap[a] : -1;
+    const phaseB = timeline.channelPhaseMap[b] !== undefined ? timeline.channelPhaseMap[b] : -1;
+    return phaseA - phaseB;
+  });
+
+  for (let ci = 0; ci < controllingChannels.length; ci++) {
+    const chId = controllingChannels[ci];
+    const phaseIdx = timeline.channelPhaseMap[chId];
+    if (phaseIdx === undefined) continue;
+
+    const phase = timeline.phases[phaseIdx];
+    const seq = findSequenceByChannelId(side, chId);
+    const seqDur = seq ? getSequenceDuration(seq) : 0;
+
+    const effectiveEnd = phase.maxDuration !== null
+      ? Math.min(phase.start + seqDur, phase.start + phase.maxDuration)
+      : phase.start + seqDur;
+
+    if (time >= phase.start && time < effectiveEnd) {
+      const localTime = time - phase.start;
+      if (phase.maxDuration !== null && localTime >= phase.maxDuration) return 0;
+      // Phase 2+ starts from default brightness; Phase 1 starts from 0
+      let initBri = 0;
+      if (ci > 0) {
+        const defaultState = defaults[physicalChId];
+        initBri = defaultState ? (defaultState.brightness || 0) : 0;
       }
-    });
+      return seq ? getBrightnessAtTime(seq, localTime, initBri) : 0;
+    }
+
+    // Check for gap between phases — interpolate to/from default brightness
+    const nextCi = ci + 1;
+    if (nextCi < controllingChannels.length) {
+      const nextChId = controllingChannels[nextCi];
+      const nextPhaseIdx = timeline.channelPhaseMap[nextChId];
+      if (nextPhaseIdx !== undefined) {
+        const nextPhase = timeline.phases[nextPhaseIdx];
+
+        if (time >= effectiveEnd && time < nextPhase.start) {
+          const defaultState = defaults[physicalChId] || { brightness: 0 };
+          const defaultBri = defaultState.brightness || 0;
+          const rampUp = defaultState.rampUp || 0;
+          const rampDown = defaultState.rampDown || 0;
+
+          const lastBri = seq ? getBrightnessAtTime(seq, effectiveEnd - phase.start) : 0;
+          const gapStart = effectiveEnd;
+          const gapEnd = nextPhase.start;
+
+          if (rampUp > 0 && time < gapStart + rampUp) {
+            const progress = (time - gapStart) / rampUp;
+            return lastBri + (defaultBri - lastBri) * progress;
+          }
+
+          const nextInitBri = defaultBri;
+
+          if (rampDown > 0 && time > gapEnd - rampDown) {
+            const progress = (time - (gapEnd - rampDown)) / rampDown;
+            return defaultBri + (nextInitBri - defaultBri) * progress;
+          }
+
+          return defaultBri;
+        }
+      }
+    }
+  }
+
+  if (time >= timeline.totalDuration) return 0;
+
+  return 0;
+}
+
+function getPhysicalLightSource(physicalChId, time, side, config) {
+  if (!currentPhaseTimeline) return 'off';
+
+  const timeline = currentPhaseTimeline;
+  const defaults = config.defaultStates || {};
+
+  // Gather all channels controlling this physical light, sorted by phase
+  const controllingChannels = [physicalChId];
+  for (const ch of config.channels) {
+    if (ch.physicalLight === physicalChId) {
+      controllingChannels.push(ch.id);
+    }
+  }
+
+  controllingChannels.sort((a, b) => {
+    const phaseA = timeline.channelPhaseMap[a] !== undefined ? timeline.channelPhaseMap[a] : -1;
+    const phaseB = timeline.channelPhaseMap[b] !== undefined ? timeline.channelPhaseMap[b] : -1;
+    return phaseA - phaseB;
+  });
+
+  for (let ci = 0; ci < controllingChannels.length; ci++) {
+    const chId = controllingChannels[ci];
+    const phaseIdx = timeline.channelPhaseMap[chId];
+    if (phaseIdx === undefined) continue;
+
+    const phase = timeline.phases[phaseIdx];
+    const seq = findSequenceByChannelId(side, chId);
+    const seqDur = seq ? getSequenceDuration(seq) : 0;
+
+    const effectiveEnd = phase.maxDuration !== null
+      ? Math.min(phase.start + seqDur, phase.start + phase.maxDuration)
+      : phase.start + seqDur;
+
+    if (time >= phase.start && time < effectiveEnd) {
+      const localTime = time - phase.start;
+      if (phase.maxDuration !== null && localTime >= phase.maxDuration) return 'off';
+      return 'channel';
+    }
+
+    // Check for gap between phases — determine source type
+    const nextCi = ci + 1;
+    if (nextCi < controllingChannels.length) {
+      const nextChId = controllingChannels[nextCi];
+      const nextPhaseIdx = timeline.channelPhaseMap[nextChId];
+      if (nextPhaseIdx !== undefined) {
+        const nextPhase = timeline.phases[nextPhaseIdx];
+
+        if (time >= effectiveEnd && time < nextPhase.start) {
+          const defaultState = defaults[physicalChId] || { brightness: 0 };
+          const rampUp = defaultState.rampUp || 0;
+          const rampDown = defaultState.rampDown || 0;
+          const gapEnd = nextPhase.start;
+
+          if (rampUp > 0 && time < effectiveEnd + rampUp) return 'rampUp';
+          if (rampDown > 0 && time > gapEnd - rampDown) return 'rampDown';
+          return 'default';
+        }
+      }
+    }
+  }
+
+  if (time >= timeline.totalDuration) return 'off';
+  return 'off';
+}
+
+function updateVisuals(time) {
+  // Phase-aware rendering path
+  if (currentPhaseTimeline) {
+    const vehicleKey = document.getElementById("vehicleSelect").value;
+    const config = VEHICLE_CONFIGS[vehicleKey] || VEHICLE_CONFIGS["generic"];
+
+    if (config.channels) {
+      for (const side of ['left', 'right']) {
+        for (const channel of config.channels) {
+          if (channel.physicalLight) continue;
+
+          const el = document.getElementById(`${side}_light_ch${channel.id}`);
+          if (!el) continue;
+
+          const hasPhysicalRefs = config.channels.some(ch => ch.physicalLight === channel.id);
+
+          if (hasPhysicalRefs) {
+            const bri = getPhysicalLightBrightness(channel.id, time, side, config);
+            applyBrightness(el, bri);
+          } else {
+            const phaseIdx = currentPhaseTimeline.channelPhaseMap[channel.id];
+            if (phaseIdx !== undefined) {
+              const phase = currentPhaseTimeline.phases[phaseIdx];
+              const seq = findSequenceByChannelId(side, channel.id);
+              const localTime = time - phase.start;
+              if (time >= phase.start && time < phase.end && localTime >= 0) {
+                const cappedTime = (phase.maxDuration !== null)
+                  ? Math.min(localTime, phase.maxDuration)
+                  : localTime;
+                if (phase.maxDuration !== null && localTime >= phase.maxDuration) {
+                  applyBrightness(el, 0);
+                } else {
+                  const bri = seq ? getBrightnessAtTime(seq, cappedTime) : 0;
+                  applyBrightness(el, bri);
+                }
+              } else {
+                applyBrightness(el, 0);
+              }
+            } else {
+              applyBrightness(el, 0);
+            }
+          }
+        }
+      }
+    }
+  } else { // Legacy path: direct sequence-to-light mapping
+    for (const side of ['left', 'right']) {
+      sideData[side].sequences.forEach((seq, idx) => {
+        const el = getLightElement(side, seq, idx);
+        if (el) {
+          const bri = getBrightnessAtTime(seq, time);
+          applyBrightness(el, bri);
+        }
+      });
+    }
   }
 }
 
@@ -258,8 +457,8 @@ function applyBrightness(element, brightness) {
   const isSVG = element instanceof SVGElement;
   const val = Math.round((brightness / 100) * 255);
 
+  // SVG elements: modulate fill/stroke color alpha
   if (isSVG) {
-    // Get individual shapes: children of <g>, or the element itself
     const isGroup = element.tagName === 'g';
     const shapes = isGroup
       ? Array.from(element.children).filter(c => c.tagName !== 'title')
@@ -292,8 +491,7 @@ function applyBrightness(element, brightness) {
         element.style.filter = "none";
       }
     }
-  } else {
-    // HTML div styling
+  } else { // HTML div elements: modulate background grayscale
     element.style.backgroundColor = `rgb(${val}, ${val}, ${val})`;
     if (brightness > 0) {
       element.style.boxShadow = `0 0 ${brightness / 3}px rgba(255, 255, 255, ${brightness / 100})`;
@@ -305,31 +503,28 @@ function applyBrightness(element, brightness) {
   }
 }
 
-function getBrightnessAtTime(seq, timeObj) {
-  if (!seq || seq.identifier === "RAW") return 0;
+function getBrightnessAtTime(seq, timeObj, initialBrightness) {
+  if (!seq || seq.identifier === RAW_IDENTIFIER) return 0;
 
-  // Interpolation Logic matching the Chart
   let tStart = 0;
-  let bStart = 0;
+  let bStart = (initialBrightness !== undefined) ? initialBrightness : 0;
 
   for (let i = 0; i < seq.data.length; i += 2) {
-    let durHex = parseInt(seq.data[i], 16) || 0;
-    let briHex = parseInt(seq.data[i + 1], 16) || 0;
+    const durHex = parseInt(seq.data[i], 16) || 0;
+    const briHex = parseInt(seq.data[i + 1], 16) || 0;
     // Real-world validation: 60fps recordings confirmed ×20 multiplier (BMW G20 2020)
-    // See timing_analysis.md for detailed analysis
-    let stepDur = durHex * 20;
-    let bEnd = Math.min(briHex, 100);
-    let tEnd = tStart + stepDur;
+    const stepDur = durHex * 20;
+    const bEnd = Math.min(briHex, 100);
+    const tEnd = tStart + stepDur;
 
     if (timeObj >= tStart && timeObj <= tEnd) {
-      // Interpolate
       if (stepDur === 0) return bEnd;
-      let progress = (timeObj - tStart) / stepDur;
+      const progress = (timeObj - tStart) / stepDur;
       return bStart + (bEnd - bStart) * progress;
     }
 
     tStart = tEnd;
     bStart = bEnd;
   }
-  return bStart; // Hold last value
+  return bStart;
 }

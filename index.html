@@ -14,15 +14,15 @@
 <body>
   <h2>Advanced Welcome Light Visualizer</h2>
 
-  <div style="margin-bottom: 20px; text-align: center; display: flex; justify-content: center; gap: 20px;">
+  <div class="selector-row">
     <div>
-      <label for="templateSelect" style="display: inline-block; margin-right: 10px;">Load Template:</label>
+      <label for="templateSelect" class="selector-label">Load Template:</label>
       <select id="templateSelect" onchange="loadSelectedTemplate(); updateURLParams()">
         <option value="">-- Select a Template --</option>
       </select>
     </div>
     <div>
-      <label for="vehicleSelect" style="display: inline-block; margin-right: 10px;">Vehicle Model:</label>
+      <label for="vehicleSelect" class="selector-label">Vehicle Model:</label>
       <select id="vehicleSelect" onchange="buildDynamicFields(); updateURLParams()">
         <!-- Populated dynamically -->
       </select>
@@ -69,7 +69,7 @@
     </div>
   </div>
 
-  <div style="text-align: center; margin-bottom: 20px;">
+  <div class="action-buttons">
     <button onclick="buildDynamicFields()">Parse & Build Dynamic Fields</button>
     <button onclick="clearAllFields()">Clear All</button>
   </div>
@@ -80,7 +80,7 @@
       <button onclick="togglePlay()">Play/Pause</button>
       <button onclick="stopAnimation()">Stop</button>
 
-      <label for="speedSelect" style="margin-left: 10px;">Speed:</label>
+      <label for="speedSelect" class="speed-label">Speed:</label>
       <select id="speedSelect" onchange="changeSpeed(this.value)">
         <option value="0.5">0.5x</option>
         <option value="1" selected>1.0x</option>
@@ -95,13 +95,12 @@
 
     <div class="lights-container">
       <div class="light-group">
-        <h4 style="color: rgb(0, 0, 255);">L</h4>
+        <h4 class="side-label-left">L</h4>
         <div class="lights-grid" id="leftLights"></div>
       </div>
       <div class="light-group right-group">
-        <h4 style="color: rgb(255, 0, 0);">R</h4>
-        <!-- keep flex-direction: row-reverse for right side mirroring -->
-        <div class="lights-grid" id="rightLights" style="flex-direction: row-reverse;"></div>
+        <h4 class="side-label-right">R</h4>
+        <div class="lights-grid" id="rightLights"></div>
       </div>
     </div>
   </div>
