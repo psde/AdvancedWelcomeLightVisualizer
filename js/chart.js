@@ -474,15 +474,41 @@ function createSummaryChart(physicalChId, containerDiv, config) {
       drawChartFrame(sketch, margin, w, h, maxTime);
       drawPerLightBoundaries(sketch, margin, w, h, maxTime, physicalChId, config);
 
-      // Sample brightness at regular intervals across timeline
+      // Build sample times: regular intervals + exact sequence keyframe times
       const sampleCount = Math.min(w, 500);
-      const step = maxTime / sampleCount;
+      const regularStep = maxTime / sampleCount;
+      const sampleTimes = new Set();
+      for (let i = 0; i <= sampleCount; i++) {
+        sampleTimes.add(i * regularStep);
+      }
+
+      // Add exact keyframe times from all controlling channels
+      const controllingIds = [physicalChId];
+      for (const ch of config.channels) {
+        if (ch.physicalLight === physicalChId) controllingIds.push(ch.id);
+      }
+      for (const chId of controllingIds) {
+        const phaseIdx = currentPhaseTimeline.channelPhaseMap[chId];
+        if (phaseIdx === undefined) continue;
+        const phase = currentPhaseTimeline.phases[phaseIdx];
+        for (const side of ['left', 'right']) {
+          const seq = findSequenceByChannelId(side, chId);
+          if (!seq || seq.identifier === RAW_IDENTIFIER) continue;
+          let cumTime = phase.start;
+          for (let di = 0; di < seq.data.length; di += 2) {
+            const durHex = parseInt(seq.data[di], 16) || 0;
+            cumTime += durHex * 20;
+            if (cumTime <= maxTime) sampleTimes.add(cumTime);
+          }
+        }
+      }
+
+      const sortedTimes = Array.from(sampleTimes).sort((a, b) => a - b);
 
       const leftPoints = [];
       const rightPoints = [];
 
-      for (let i = 0; i <= sampleCount; i++) {
-        const t = i * step;
+      for (const t of sortedTimes) {
         leftPoints.push({
           t,
           b: getPhysicalLightBrightness(physicalChId, t, 'left', config),
