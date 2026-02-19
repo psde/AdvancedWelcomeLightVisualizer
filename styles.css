@@ -590,3 +590,101 @@ textarea.overflow-error {
 .summary-header {
   margin: 10px 0 5px;
 }
+
+/* Timeline Editor */
+.timeline-wrapper {
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.timeline-editor {
+  display: block;
+  width: 100%;
+  cursor: default;
+  outline: none;
+  background-color: #fff;
+  border-radius: 3px;
+}
+
+.timeline-editor.tl-dragging {
+  cursor: grabbing;
+}
+
+.tl-grid line {
+  shape-rendering: crispEdges;
+}
+
+.tl-grid text {
+  font-family: Arial, sans-serif;
+  user-select: none;
+}
+
+.tl-fill polygon {
+  pointer-events: none;
+}
+
+.tl-curve polyline {
+  pointer-events: none;
+}
+
+.tl-handles circle.tl-handle {
+  cursor: grab;
+  transition: r 0.1s;
+}
+
+.tl-handles circle.tl-handle:hover {
+  r: 8;
+}
+
+.tl-handles circle.tl-handle.selected {
+  r: 9;
+  stroke-width: 3;
+}
+
+.tl-handles circle.tl-origin {
+  cursor: default;
+}
+
+.tl-inspector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  margin-top: 6px;
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.tl-inspector-label {
+  font-weight: bold;
+  color: #555;
+}
+
+.tl-inspector-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #666;
+  font-size: 12px;
+  margin: 0;
+}
+
+.tl-inspector-input {
+  width: 60px;
+  padding: 2px 4px;
+  font-size: 11px;
+  font-family: monospace;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  text-align: right;
+}
+
+.tl-inspector-input:focus {
+  outline: none;
+  border-color: #007bff;
+}

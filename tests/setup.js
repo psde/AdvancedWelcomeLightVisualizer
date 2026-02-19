@@ -6,13 +6,27 @@ const assert = require('node:assert');
 // DOM Stubs + Load Production Code
 // ============================================================================
 globalThis.window = { addEventListener: function() {}, onload: null, location: { search: '' } };
+const stubElement = () => ({
+  appendChild: function() {},
+  setAttribute: function() {},
+  getAttribute: function() { return null; },
+  addEventListener: function() {},
+  textContent: ''
+});
 globalThis.document = {
   getElementById: function() { return null; },
-  createElement: function() { return { appendChild: function() {} }; }
+  createElement: function() { return stubElement(); },
+  createElementNS: function() { return stubElement(); },
+  addEventListener: function() {},
+  removeEventListener: function() {},
+  contains: function() { return false; },
+  body: { observe: function() {} }
 };
 globalThis.navigator = { clipboard: {} };
 globalThis.requestAnimationFrame = function() {};
 globalThis.cancelAnimationFrame = function() {};
+globalThis.ResizeObserver = class { observe() {} disconnect() {} };
+globalThis.MutationObserver = class { observe() {} disconnect() {} };
 
 // Load production code into global scope (like <script> tags)
 vm.runInThisContext(fs.readFileSync('templates.js', 'utf8'), { filename: 'templates.js' });
@@ -21,6 +35,7 @@ vm.runInThisContext(fs.readFileSync('js/core.js', 'utf8'), { filename: 'js/core.
 vm.runInThisContext(fs.readFileSync('js/animation.js', 'utf8'), { filename: 'js/animation.js' });
 vm.runInThisContext(fs.readFileSync('js/chart.js', 'utf8'), { filename: 'js/chart.js' });
 vm.runInThisContext(fs.readFileSync('js/editor.js', 'utf8'), { filename: 'js/editor.js' });
+vm.runInThisContext(fs.readFileSync('js/timeline.js', 'utf8'), { filename: 'js/timeline.js' });
 vm.runInThisContext(fs.readFileSync('js/init.js', 'utf8'), { filename: 'js/init.js' });
 
 // ============================================================================

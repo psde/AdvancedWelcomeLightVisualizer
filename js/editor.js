@@ -36,6 +36,8 @@ function renderSequenceEditor(side, seqIndex, scrollBehavior) {
 
   if (mode === 'hex') {
     renderHexEditor(contentDiv, side, seqIndex, seq);
+  } else if (mode === 'timeline') {
+    renderTimelineEditor(contentDiv, side, seqIndex, seq);
   } else {
     renderVisualEditor(contentDiv, side, seqIndex, seq, scrollBehavior);
   }
@@ -614,6 +616,12 @@ function createSeqSubblock(side, seqIndex) {
   // Editor toggle inline in header
   const toggle = document.createElement("span");
   toggle.className = "editor-toggle";
+
+  const timelineBtn = document.createElement('button');
+  timelineBtn.dataset.mode = 'timeline';
+  timelineBtn.textContent = '\uD83D\uDCC8 Timeline';
+  timelineBtn.onclick = () => toggleEditMode(side, seqIndex, 'timeline');
+  toggle.appendChild(timelineBtn);
 
   const visualBtn = document.createElement('button');
   visualBtn.dataset.mode = 'visual';
