@@ -1,18 +1,26 @@
 const editModes = { left: {}, right: {} };
+let focusedStep = null;
+
+function formatStepTime(ms) {
+  if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${ms}ms`;
+}
 
 function toggleEditMode(side, seqIndex, mode) {
   editModes[side][seqIndex] = mode;
   renderSequenceEditor(side, seqIndex);
 }
 
-function renderSequenceEditor(side, seqIndex) {
+function renderSequenceEditor(side, seqIndex, scrollBehavior) {
   const container = document.getElementById(`editor_${side}_${seqIndex}`);
   if (!container) return;
 
   const mode = editModes[side][seqIndex] || 'hex';
   const seq = sideData[side].sequences[seqIndex];
 
-  const toggleDiv = container.querySelector('.editor-toggle');
+  // Toggle buttons live in the H4 header (parent subblock)
+  const subblock = container.closest('.seq-subblock');
+  const toggleDiv = subblock ? subblock.querySelector('.editor-toggle') : null;
   if (toggleDiv) {
     toggleDiv.querySelectorAll('button').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.mode === mode);
@@ -29,28 +37,58 @@ function renderSequenceEditor(side, seqIndex) {
   if (mode === 'hex') {
     renderHexEditor(contentDiv, side, seqIndex, seq);
   } else {
-    renderVisualEditor(contentDiv, side, seqIndex, seq);
+    renderVisualEditor(contentDiv, side, seqIndex, seq, scrollBehavior);
   }
 }
 
 function renderHexEditor(container, side, seqIndex, seq) {
   container.innerHTML = '';
-  const textarea = document.createElement('textarea');
-  textarea.value = seq ? sequenceToString(seq) : '';
-  textarea.className = 'hex-editor';
-  textarea.oninput = (e) => {
-    sideData[side].sequences[seqIndex] = stringToSequence(e.target.value);
-    applySequenceEdit(side, seqIndex);
-    updateSeqLabels(seqIndex);
-  };
-  container.appendChild(textarea);
+
+  if (seq && seq.identifier !== RAW_IDENTIFIER) {
+    // Locked header for non-RAW: channel ID and step count are read-only
+    const infoLine = document.createElement('div');
+    infoLine.className = 'hex-info-line';
+    const chNum = parseInt(seq.identifier, 16);
+    const stepCount = Math.floor(seq.data.length / 2);
+    infoLine.textContent = `Channel: 0x${seq.identifier.toUpperCase()} (${chNum}) | Steps: ${stepCount}`;
+    container.appendChild(infoLine);
+
+    const textarea = document.createElement('textarea');
+    textarea.value = buildByteString(seq.data);
+    textarea.className = 'hex-editor';
+    textarea.oninput = (e) => {
+      const dataBytes = parseByteString(e.target.value);
+      seq.data = dataBytes;
+      seq.lengthVal = Math.floor(dataBytes.length / 2);
+      applySequenceEdit(side, seqIndex);
+      updateSeqLabels(seqIndex);
+    };
+    container.appendChild(textarea);
+  } else {
+    // RAW or null — full hex editing
+    const textarea = document.createElement('textarea');
+    textarea.value = seq ? sequenceToString(seq) : '';
+    textarea.className = 'hex-editor';
+    textarea.oninput = (e) => {
+      sideData[side].sequences[seqIndex] = stringToSequence(e.target.value);
+      applySequenceEdit(side, seqIndex);
+      updateSeqLabels(seqIndex);
+    };
+    container.appendChild(textarea);
+  }
 }
 
-function renderVisualEditor(container, side, seqIndex, seq) {
+function renderVisualEditor(container, side, seqIndex, seq, scrollBehavior) {
+  const existingEditor = container.querySelector('.visual-editor');
+  const savedScrollTop = existingEditor ? existingEditor.scrollTop : 0;
+
   container.innerHTML = '';
 
   if (!seq || seq.identifier === RAW_IDENTIFIER) {
-    container.innerHTML = '<p style="color:#999;font-size:12px;">RAW data - use hex mode to edit</p>';
+    const msg = document.createElement('p');
+    msg.className = 'raw-data-msg';
+    msg.textContent = 'RAW data \u2014 use hex mode to edit';
+    container.appendChild(msg);
     return;
   }
 
@@ -65,16 +103,49 @@ function renderVisualEditor(container, side, seqIndex, seq) {
     steps.push({ duration: durHex, brightness: Math.min(briHex, 100) });
   }
 
-  // Build step rows with duration/brightness controls
+  // Build step rows with insert buttons, controls, and duration/brightness fields
+  let cumulativeTime = 0;
   steps.forEach((step, stepIdx) => {
+    editorDiv.appendChild(createInsertRow(side, seqIndex, stepIdx - 1));
+
     const row = document.createElement('div');
     row.className = 'step-row';
 
+    // Step controls: label + move + delete
+    const controls = document.createElement('div');
+    controls.className = 'step-controls';
+
     const label = document.createElement('span');
     label.className = 'step-label';
-    label.textContent = `#${stepIdx + 1}`;
-    row.appendChild(label);
+    label.textContent = `#${stepIdx + 1} @ ${formatStepTime(cumulativeTime)}`;
+    controls.appendChild(label);
 
+    const upBtn = document.createElement('button');
+    upBtn.className = 'step-action-btn';
+    upBtn.textContent = '\u25B2';
+    upBtn.title = 'Move up';
+    upBtn.disabled = stepIdx === 0;
+    upBtn.onclick = () => moveStep(side, seqIndex, stepIdx, -1);
+    controls.appendChild(upBtn);
+
+    const downBtn = document.createElement('button');
+    downBtn.className = 'step-action-btn';
+    downBtn.textContent = '\u25BC';
+    downBtn.title = 'Move down';
+    downBtn.disabled = stepIdx === steps.length - 1;
+    downBtn.onclick = () => moveStep(side, seqIndex, stepIdx, 1);
+    controls.appendChild(downBtn);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'step-action-btn step-remove';
+    removeBtn.textContent = '\u2715';
+    removeBtn.title = 'Remove step';
+    removeBtn.onclick = () => removeStep(side, seqIndex, stepIdx);
+    controls.appendChild(removeBtn);
+
+    row.appendChild(controls);
+
+    // Duration field
     const durField = document.createElement('div');
     durField.className = 'step-field';
     durField.innerHTML = `
@@ -87,6 +158,7 @@ function renderVisualEditor(container, side, seqIndex, seq) {
     `;
     row.appendChild(durField);
 
+    // Brightness field
     const briField = document.createElement('div');
     briField.className = 'step-field';
     briField.innerHTML = `
@@ -99,14 +171,25 @@ function renderVisualEditor(container, side, seqIndex, seq) {
     `;
     row.appendChild(briField);
 
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'step-remove';
-    removeBtn.textContent = '\u2715';
-    removeBtn.onclick = () => removeStep(side, seqIndex, stepIdx);
-    row.appendChild(removeBtn);
+    // Hover highlights corresponding point on chart
+    row.addEventListener('mouseenter', () => {
+      focusedStep = { side, seqIndex, stepIndex: stepIdx };
+    });
+    row.addEventListener('mouseleave', () => {
+      if (focusedStep && focusedStep.side === side &&
+          focusedStep.seqIndex === seqIndex && focusedStep.stepIndex === stepIdx) {
+        focusedStep = null;
+      }
+    });
 
     editorDiv.appendChild(row);
+    cumulativeTime += step.duration * 20;
   });
+
+  // Final insert button after last step
+  if (steps.length > 0) {
+    editorDiv.appendChild(createInsertRow(side, seqIndex, steps.length - 1));
+  }
 
   // Wire up slider input handlers
   editorDiv.querySelectorAll('input[type="range"]').forEach(slider => {
@@ -155,6 +238,61 @@ function renderVisualEditor(container, side, seqIndex, seq) {
   editorDiv.appendChild(addBtn);
 
   container.appendChild(editorDiv);
+
+  // Restore or set scroll position
+  if (scrollBehavior === 'add') {
+    editorDiv.scrollTop = editorDiv.scrollHeight;
+  } else {
+    editorDiv.scrollTop = Math.min(savedScrollTop, editorDiv.scrollHeight - editorDiv.clientHeight);
+  }
+}
+
+function createInsertRow(side, seqIndex, afterStepIndex) {
+  const row = document.createElement('div');
+  row.className = 'insert-row';
+
+  const btn = document.createElement('button');
+  btn.className = 'insert-step-btn';
+  btn.textContent = '+';
+  btn.title = 'Insert step here';
+  btn.onclick = () => insertStepAfter(side, seqIndex, afterStepIndex);
+  row.appendChild(btn);
+
+  return row;
+}
+
+function insertStepAfter(side, seqIndex, afterStepIndex) {
+  const seq = sideData[side].sequences[seqIndex];
+  if (!seq || seq.identifier === RAW_IDENTIFIER) return;
+
+  const insertPos = (afterStepIndex + 1) * 2;
+  seq.data.splice(insertPos, 0, '0A', '00');
+  seq.lengthVal = Math.floor(seq.data.length / 2);
+
+  applySequenceEdit(side, seqIndex);
+  renderSequenceEditor(side, seqIndex, 'insert');
+}
+
+function moveStep(side, seqIndex, stepIndex, direction) {
+  const seq = sideData[side].sequences[seqIndex];
+  if (!seq || seq.identifier === RAW_IDENTIFIER) return;
+
+  const targetIndex = stepIndex + direction;
+  if (targetIndex < 0 || targetIndex >= Math.floor(seq.data.length / 2)) return;
+
+  const fromPos = stepIndex * 2;
+  const toPos = targetIndex * 2;
+
+  // Swap two data pairs
+  const fromDur = seq.data[fromPos];
+  const fromBri = seq.data[fromPos + 1];
+  seq.data[fromPos] = seq.data[toPos];
+  seq.data[fromPos + 1] = seq.data[toPos + 1];
+  seq.data[toPos] = fromDur;
+  seq.data[toPos + 1] = fromBri;
+
+  applySequenceEdit(side, seqIndex);
+  renderSequenceEditor(side, seqIndex, 'move');
 }
 
 function applySequenceEdit(side, seqIndex) {
@@ -202,7 +340,7 @@ function addStep(side, seqIndex) {
   seq.lengthVal = Math.floor(seq.data.length / 2);
 
   applySequenceEdit(side, seqIndex);
-  renderSequenceEditor(side, seqIndex);
+  renderSequenceEditor(side, seqIndex, 'add');
 }
 
 function removeStep(side, seqIndex, stepIndex) {
@@ -215,7 +353,7 @@ function removeStep(side, seqIndex, stepIndex) {
     seq.lengthVal = Math.floor(seq.data.length / 2);
 
     applySequenceEdit(side, seqIndex);
-    renderSequenceEditor(side, seqIndex);
+    renderSequenceEditor(side, seqIndex, 'remove');
   }
 }
 
@@ -450,10 +588,17 @@ function createSeqSubblock(side, seqIndex) {
   const sub = document.createElement("div");
   sub.className = isLeft ? "seq-subblock" : "seq-subblock seq-subblock-right";
 
-  // Header with label and copy button
+  // Header: label group, editor toggle, copy button
   const h4 = document.createElement("h4");
-  const seqLabel = getSeqLabel(side, seqIndex);
-  h4.innerHTML = `<span data-label-side="${side}" data-label-seq="${seqIndex}">${seqLabel}</span> <button class="mini-copy-btn" onclick="copySequence('${side}', ${seqIndex})" title="${copyTitle}">${arrow}</button>`;
+
+  const labelGroup = document.createElement('div');
+  labelGroup.className = 'seq-label-group';
+
+  const labelSpan = document.createElement('span');
+  labelSpan.setAttribute('data-label-side', side);
+  labelSpan.setAttribute('data-label-seq', seqIndex);
+  labelSpan.textContent = getSeqLabel(side, seqIndex);
+  labelGroup.appendChild(labelSpan);
 
   const capMs = getChannelCapWarning(seqIndex);
   if (capMs !== null) {
@@ -461,22 +606,43 @@ function createSeqSubblock(side, seqIndex) {
     warn.className = 'cap-warning';
     warn.textContent = `Content exceeds ${capMs}ms cap`;
     warn.title = `Phase hard cap: animation cuts off at ${capMs}ms`;
-    h4.appendChild(warn);
+    labelGroup.appendChild(warn);
   }
+
+  h4.appendChild(labelGroup);
+
+  // Editor toggle inline in header
+  const toggle = document.createElement("span");
+  toggle.className = "editor-toggle";
+
+  const visualBtn = document.createElement('button');
+  visualBtn.dataset.mode = 'visual';
+  visualBtn.textContent = '\uD83D\uDCDD Visual';
+  visualBtn.onclick = () => toggleEditMode(side, seqIndex, 'visual');
+  toggle.appendChild(visualBtn);
+
+  const hexBtn = document.createElement('button');
+  hexBtn.dataset.mode = 'hex';
+  hexBtn.className = 'active';
+  hexBtn.textContent = '<> Hex';
+  hexBtn.onclick = () => toggleEditMode(side, seqIndex, 'hex');
+  toggle.appendChild(hexBtn);
+
+  h4.appendChild(toggle);
+
+  // Copy button
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'mini-copy-btn';
+  copyBtn.onclick = () => copySequence(side, seqIndex);
+  copyBtn.title = copyTitle;
+  copyBtn.textContent = arrow;
+  h4.appendChild(copyBtn);
 
   sub.appendChild(h4);
 
-  // Editor container with hex/visual mode toggle
+  // Editor container (toggle no longer here)
   const editor = document.createElement("div");
   editor.id = `editor_${side}_${seqIndex}`;
-
-  const toggle = document.createElement("div");
-  toggle.className = "editor-toggle";
-  toggle.innerHTML = `
-    <button data-mode="visual" onclick="toggleEditMode('${side}', ${seqIndex}, 'visual')">\ud83d\udcdd Visual</button>
-    <button data-mode="hex" class="active" onclick="toggleEditMode('${side}', ${seqIndex}, 'hex')">&lt;&gt; Hex</button>
-  `;
-  editor.appendChild(toggle);
   sub.appendChild(editor);
 
   return sub;

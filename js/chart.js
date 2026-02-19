@@ -217,6 +217,54 @@ function drawPerLightBoundaries(sketch, margin, w, h, maxTime, physicalChId, con
   sketch.textSize(11);
 }
 
+function drawFocusedStepHighlight(sketch, margin, w, h, maxTime, seqIndex, leftData, rightData) {
+  if (!focusedStep || focusedStep.seqIndex !== seqIndex) return;
+
+  const side = focusedStep.side;
+  const pts = side === 'left' ? leftData.points : rightData.points;
+  const pointIdx = focusedStep.stepIndex + 1; // +1 because points[0] is initial {t:0, b:0}
+
+  if (pointIdx < 1 || pointIdx >= pts.length) return;
+
+  const pStart = pts[pointIdx - 1];
+  const pEnd = pts[pointIdx];
+
+  const x1 = sketch.map(pStart.t, 0, maxTime, margin, margin + w);
+  const y1 = sketch.map(pStart.b, 0, 100, margin + h, margin);
+  const x2 = sketch.map(pEnd.t, 0, maxTime, margin, margin + w);
+  const y2 = sketch.map(pEnd.b, 0, 100, margin + h, margin);
+
+  const sideColor = side === 'left' ? sketch.color(0, 0, 255) : sketch.color(255, 0, 0);
+
+  // Highlight the segment (thicker)
+  sketch.stroke(sideColor);
+  sketch.strokeWeight(4);
+  sketch.line(x1, y1, x2, y2);
+
+  // Crosshair lines from end point to axes
+  sketch.stroke(100, 100, 100, 120);
+  sketch.strokeWeight(1);
+  sketch.drawingContext.setLineDash([3, 3]);
+  sketch.line(x2, margin + h, x2, y2);
+  sketch.line(margin, y2, x2, y2);
+  sketch.drawingContext.setLineDash([]);
+
+  // Dot at end point
+  sketch.fill(sideColor);
+  sketch.stroke(255);
+  sketch.strokeWeight(2);
+  sketch.circle(x2, y2, 10);
+
+  // Value label
+  sketch.noStroke();
+  sketch.fill(50);
+  sketch.textAlign(sketch.LEFT, sketch.BOTTOM);
+  sketch.textSize(10);
+  const timeLabel = formatStepTime(pEnd.t);
+  sketch.text(`${timeLabel}, ${pEnd.b}%`, x2 + 8, y2 - 4);
+  sketch.textSize(11);
+}
+
 function drawPositionIndicator(sketch, margin, w, h, maxTime) {
   if (typeof currentAnimTime !== 'undefined') {
     const xPos = sketch.map(currentAnimTime, 0, maxTime, margin, margin + w);
@@ -405,6 +453,7 @@ function createSingleChart(seqIndex, containerDiv) {
       }
     }
 
+    drawFocusedStepHighlight(sketch, margin, w, h, maxTime, seqIndex, leftData, rightData);
     drawPositionIndicator(sketch, margin, w, h, maxTime);
     return maxTime;
   }, getFocusElements);

@@ -112,8 +112,13 @@ button {
   margin-bottom: 5px;
   font-size: 1em;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 6px;
+}
+
+.seq-label-group {
+  flex: 1;
+  min-width: 0;
 }
 
 .seq-subblock-right h4 {
@@ -295,9 +300,10 @@ input[type=range] {
 
 /* Visual Editor Styles */
 .editor-toggle {
-  display: flex;
+  display: inline-flex;
   gap: 0;
-  margin-bottom: 8px;
+  margin: 0;
+  flex-shrink: 0;
 }
 
 .editor-toggle button {
@@ -342,18 +348,38 @@ input[type=range] {
   background-color: #fff;
   border: 1px solid #e0e0e0;
   border-radius: 4px;
-  margin-bottom: 6px;
 }
 
-.step-row:last-of-type {
-  margin-bottom: 0;
+.step-controls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .step-label {
   font-weight: bold;
   font-size: 12px;
-  min-width: 50px;
   color: #555;
+  white-space: nowrap;
+  margin-right: 2px;
+}
+
+.step-action-btn {
+  padding: 1px 5px;
+  font-size: 10px;
+  line-height: 1;
+  margin: 0;
+  min-width: 20px;
+  background-color: #6c757d;
+}
+
+.step-action-btn:hover:not(:disabled) {
+  background-color: #5a6268;
+}
+
+.step-action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .step-field {
@@ -398,14 +424,59 @@ input[type=range] {
   border-color: #007bff;
 }
 
-.step-remove {
+.step-action-btn.step-remove {
   background-color: #dc3545;
-  padding: 2px 8px;
-  font-size: 11px;
 }
 
-.step-remove:hover {
+.step-action-btn.step-remove:hover {
   background-color: #c82333;
+}
+
+/* Insert step row between steps */
+.insert-row {
+  display: flex;
+  justify-content: center;
+  margin: 2px 0;
+}
+
+.insert-step-btn {
+  background: transparent;
+  border: 1px dashed #e0e0e0;
+  color: #ccc;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  height: 10px;
+  line-height: 8px;
+  font-size: 10px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.15s;
+}
+
+.insert-step-btn:hover {
+  background-color: #e8f5e9;
+  border-color: #28a745;
+  color: #28a745;
+}
+
+/* Hex editor locked info line */
+.hex-info-line {
+  font-size: 11px;
+  font-family: monospace;
+  color: #666;
+  padding: 4px 6px;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  margin-bottom: 4px;
+}
+
+/* RAW data message in visual mode */
+.raw-data-msg {
+  color: #999;
+  font-size: 12px;
+  margin: 0;
 }
 
 .add-step-btn {
