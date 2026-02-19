@@ -1,3 +1,5 @@
+let loadedTemplateKey = null;
+
 function copyToClipboard(fieldId) {
   const text = document.getElementById(fieldId).value;
   navigator.clipboard.writeText(text)
@@ -18,6 +20,32 @@ function pasteFromClipboard(fieldId) {
     .catch(err => {
       console.error("Failed to paste!", err);
     });
+}
+
+function copyAllFields() {
+  const data = {
+    left1: document.getElementById('leftStaging1').value,
+    left2: document.getElementById('leftStaging2').value,
+    right1: document.getElementById('rightStaging1').value,
+    right2: document.getElementById('rightStaging2').value,
+  };
+  navigator.clipboard.writeText(JSON.stringify(data))
+    .then(() => console.log('All fields copied to clipboard'))
+    .catch(err => console.error('Failed to copy all fields:', err));
+}
+
+function pasteAllFields() {
+  navigator.clipboard.readText()
+    .then(text => {
+      const data = JSON.parse(text);
+      document.getElementById('leftStaging1').value = data.left1 || '';
+      document.getElementById('leftStaging2').value = data.left2 || '';
+      document.getElementById('rightStaging1').value = data.right1 || '';
+      document.getElementById('rightStaging2').value = data.right2 || '';
+      buildDynamicFields();
+      onDataEdited();
+    })
+    .catch(err => console.error('Failed to paste all fields:', err));
 }
 
 function clearAllFields() {
@@ -57,17 +85,77 @@ function buildDynamicFields() {
   rebuildAnimationPlayer();
 }
 
+function onDataEdited() {
+  loadedTemplateKey = null;
+  document.getElementById('templateSelect').value = '';
+  updateURLParams();
+}
+
+function getAllBytes() {
+  return [
+    ...sideData.left.staging1Bytes,
+    ...sideData.left.staging2Bytes,
+    ...sideData.right.staging1Bytes,
+    ...sideData.right.staging2Bytes,
+  ];
+}
+
+function encodeAllBytesToBase64() {
+  return btoa(getAllBytes().map(h => String.fromCharCode(parseInt(h, 16))).join(''));
+}
+
+function hasAnyNonZeroData() {
+  return getAllBytes().some(b => b !== '00');
+}
+
 function updateURLParams() {
   try {
     const params = new URLSearchParams();
     const vehicle = document.getElementById('vehicleSelect').value;
-    const template = document.getElementById('templateSelect').value;
     if (vehicle) params.set('vehicle', vehicle);
-    if (template) params.set('template', template);
+
+    if (loadedTemplateKey) {
+      params.set('template', loadedTemplateKey);
+    } else if (hasAnyNonZeroData()) {
+      params.set('d', encodeAllBytesToBase64());
+    }
+
     const query = params.toString();
     history.replaceState(null, '', window.location.pathname + (query ? '?' + query : ''));
   } catch (e) {
     // replaceState may be restricted on file:// protocol
+  }
+}
+
+function restoreFromURLData() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const encoded = urlParams.get('d');
+  if (!encoded) return false;
+
+  try {
+    const binary = atob(encoded);
+    // 252 + 168 + 252 + 168 = 840 bytes total
+    if (binary.length !== 840) return false;
+
+    const toHexArray = (start, len) =>
+      Array.from({ length: len }, (_, i) =>
+        binary.charCodeAt(start + i).toString(16).padStart(2, '0').toUpperCase()
+      );
+
+    sideData.left.staging1Bytes = toHexArray(0, 252);
+    sideData.left.staging2Bytes = toHexArray(252, 168);
+    sideData.right.staging1Bytes = toHexArray(420, 252);
+    sideData.right.staging2Bytes = toHexArray(672, 168);
+
+    document.getElementById('leftStaging1').value = buildByteString(sideData.left.staging1Bytes);
+    document.getElementById('leftStaging2').value = buildByteString(sideData.left.staging2Bytes);
+    document.getElementById('rightStaging1').value = buildByteString(sideData.right.staging1Bytes);
+    document.getElementById('rightStaging2').value = buildByteString(sideData.right.staging2Bytes);
+
+    return true;
+  } catch (e) {
+    console.error('Failed to restore from URL data:', e);
+    return false;
   }
 }
 
@@ -125,6 +213,8 @@ function loadSelectedTemplate() {
 
   if (!key || !TEMPLATES[key]) return;
 
+  loadedTemplateKey = key;
+
   const data = TEMPLATES[key];
 
   document.getElementById('leftStaging1').value = data.left1 || "";
@@ -139,6 +229,12 @@ window.addEventListener('DOMContentLoaded', initTemplates);
 
 window.onload = () => {
   initVehicles();
-  loadSelectedTemplate();
-  buildDynamicFields(); // Ensure initialization even if no template is selected
+  const restoredFromURL = restoreFromURLData();
+  if (!restoredFromURL) {
+    loadSelectedTemplate();
+  } else {
+    document.getElementById('templateSelect').value = '';
+  }
+  buildDynamicFields();
+  updateURLParams();
 };
