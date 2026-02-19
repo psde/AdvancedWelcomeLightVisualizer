@@ -41,6 +41,7 @@ function renderHexEditor(container, side, seqIndex, seq) {
   textarea.oninput = (e) => {
     sideData[side].sequences[seqIndex] = stringToSequence(e.target.value);
     reAssembleBytes(side);
+    onDataEdited();
     updateSingleDiagram(seqIndex);
     updateSeqLabels(seqIndex);
     updateVisuals(currentAnimTime);
@@ -172,6 +173,7 @@ function copySequence(fromSide, seqIndex) {
   };
 
   reAssembleBytes(toSide);
+  onDataEdited();
 
   renderSequenceEditor(toSide, seqIndex);
   updateSingleDiagram(seqIndex);
@@ -189,6 +191,7 @@ function updateStepValue(side, seqIndex, stepIndex, type, value) {
     seq.lengthVal = Math.floor(seq.data.length / 2);
 
     reAssembleBytes(side);
+    onDataEdited();
     updateSingleDiagram(seqIndex);
     updateVisuals(currentAnimTime);
   }
@@ -202,6 +205,7 @@ function addStep(side, seqIndex) {
   seq.lengthVal = Math.floor(seq.data.length / 2);
 
   reAssembleBytes(side);
+  onDataEdited();
   updateSingleDiagram(seqIndex);
   updateVisuals(currentAnimTime);
   renderSequenceEditor(side, seqIndex);
@@ -217,6 +221,7 @@ function removeStep(side, seqIndex, stepIndex) {
     seq.lengthVal = Math.floor(seq.data.length / 2);
 
     reAssembleBytes(side);
+    onDataEdited();
     updateSingleDiagram(seqIndex);
     updateVisuals(currentAnimTime);
     renderSequenceEditor(side, seqIndex);
