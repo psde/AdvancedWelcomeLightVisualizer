@@ -360,6 +360,8 @@ function getPhysicalLightSource(physicalChId, time, side, config) {
 }
 
 function updateVisuals(time) {
+  updateAllChartPositionIndicators(time);
+
   // Phase-aware rendering path
   if (currentPhaseTimeline) {
     const vehicleKey = document.getElementById("vehicleSelect").value;

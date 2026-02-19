@@ -11,7 +11,7 @@ function getSideColor(side) {
   return TL_COLORS[side] || TL_COLORS.left;
 }
 
-// Coordinate mapping — mirrors p5.js chart approach
+// Coordinate mapping — shared between timeline editors and charts
 function timeToX(time, maxTime, plotWidth) {
   return TL_MARGIN + (time / maxTime) * plotWidth;
 }
@@ -57,6 +57,7 @@ function renderTimelineEditor(container, side, seqIndex, seq) {
   }
 
   const points = parseForChart(seq).points;
+  applyDefaultBrightnessToPoints(points, seqIndex);
   const maxTime = getTimelineMaxTime(seq, side, seqIndex);
 
   const wrapper = document.createElement('div');
@@ -742,6 +743,18 @@ function updateInspector(inspector, side, seqIndex, seq, points, pointIndex) {
   pctUnit.textContent = ' %';
   briWrapper.appendChild(pctUnit);
   inspector.appendChild(briWrapper);
+
+  // Delete button (disabled when only 1 step remains)
+  const stepCount = Math.floor(seq.data.length / 2);
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'tl-inspector-delete';
+  deleteBtn.textContent = 'Delete Point';
+  deleteBtn.title = 'Remove this point (Del)';
+  deleteBtn.disabled = stepCount <= 1;
+  deleteBtn.onclick = () => {
+    deleteTimelinePoint(side, seqIndex, seq, pointIndex, inspector);
+  };
+  inspector.appendChild(deleteBtn);
 }
 
 // SVG helper functions

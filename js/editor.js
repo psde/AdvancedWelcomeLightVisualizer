@@ -176,11 +176,13 @@ function renderVisualEditor(container, side, seqIndex, seq, scrollBehavior) {
     // Hover highlights corresponding point on chart
     row.addEventListener('mouseenter', () => {
       focusedStep = { side, seqIndex, stepIndex: stepIdx };
+      showFocusedStepOnChart(seqIndex, side, stepIdx);
     });
     row.addEventListener('mouseleave', () => {
       if (focusedStep && focusedStep.side === side &&
           focusedStep.seqIndex === seqIndex && focusedStep.stepIndex === stepIdx) {
         focusedStep = null;
+        clearFocusedStepOnChart(seqIndex);
       }
     });
 
@@ -300,7 +302,7 @@ function moveStep(side, seqIndex, stepIndex, direction) {
 function applySequenceEdit(side, seqIndex) {
   reAssembleBytes(side);
   onDataEdited();
-  updateSingleDiagram(seqIndex);
+  updateSequenceChart(seqIndex);
   updateVisuals(currentAnimTime);
 }
 
@@ -398,8 +400,7 @@ function renderDynamicSequences() {
   const container = document.getElementById("dynamicContainer");
 
   // Clean up existing chart instances
-  chartSketches.forEach(s => { if (s && s.remove) s.remove(); });
-  chartSketches = [];
+  chartInstances = [];
   cleanupSummaryCharts();
 
   const playerDiv = document.getElementById("animationPlayer");
@@ -433,6 +434,7 @@ function renderDynamicSequences() {
 
   const vehicleKey = document.getElementById("vehicleSelect") ? document.getElementById("vehicleSelect").value : null;
   const config = vehicleKey ? VEHICLE_CONFIGS[vehicleKey] : null;
+
   // Build summary charts for physical lights
   if (currentPhaseTimeline && config) {
     const physicalIds = getPhysicalLightIds(config);
@@ -457,8 +459,8 @@ function renderDynamicSequences() {
         const labelSpan = document.createElement("span");
         labelSpan.className = "diagram-label";
         const contributingChs = [phId];
-        for (const ch of config.channels) {
-          if (ch.physicalLight === phId) contributingChs.push(ch.id);
+        for (const channel of config.channels) {
+          if (channel.physicalLight === phId) contributingChs.push(channel.id);
         }
         const chListStr = contributingChs.map(id => `Ch ${id}`).join(' + ');
         labelSpan.textContent = `${label} — Resolved Timeline (${chListStr})`;
@@ -466,9 +468,7 @@ function renderDynamicSequences() {
         chartWrapper.appendChild(chartDiv);
         summarySection.appendChild(chartWrapper);
 
-        setTimeout(() => {
-          summaryChartSketches.push(createSummaryChart(phId, chartDiv, config));
-        }, 0);
+        summaryChartInstances.push(createSummaryChart(phId, chartDiv, config));
       }
 
       container.appendChild(summarySection);
@@ -488,13 +488,7 @@ function renderDynamicSequences() {
     const chartDiv = document.createElement("div");
     chartDiv.id = `chartCanvas_${i}`;
     chartDiv.className = "chartCanvas";
-    chartDiv.style.height = "250px";
-    const labelSpan = document.createElement('span');
-    labelSpan.className = 'diagram-label';
-    labelSpan.textContent = getDiagramLabel(i);
-    chartDiv.appendChild(labelSpan);
     seqBlock.appendChild(chartDiv);
-
     container.appendChild(seqBlock);
 
     editModes.left[i] = editModes.left[i] || 'hex';
@@ -502,7 +496,7 @@ function renderDynamicSequences() {
     renderSequenceEditor('left', i);
     renderSequenceEditor('right', i);
 
-    chartSketches[i] = createSingleChart(i, chartDiv);
+    chartInstances[i] = createSequenceChart(i, chartDiv);
   }
 }
 
@@ -528,37 +522,10 @@ function getSeqLabel(side, seqIndex) {
   return `Ch ${label} ${chNum} (0x${seq.identifier.toUpperCase()})${phaseSuffix}`;
 }
 
-function getDiagramLabel(seqIndex) {
-  const leftSeq = sideData.left.sequences[seqIndex];
-  const rightSeq = sideData.right.sequences[seqIndex];
-  const leftId = leftSeq && leftSeq.identifier !== RAW_IDENTIFIER ? leftSeq.identifier : null;
-  const rightId = rightSeq && rightSeq.identifier !== RAW_IDENTIFIER ? rightSeq.identifier : null;
-  if (leftId && rightId) {
-    if (leftId.toUpperCase() === rightId.toUpperCase()) {
-      const chNum = parseInt(leftId, 16);
-      const chName = getChannelName(chNum);
-      if (chName) return `${chName} — Diagram (Ch ${chNum})`;
-      return `Diagram Ch ${chNum} (0x${leftId.toUpperCase()})`;
-    }
-    const lNum = parseInt(leftId, 16);
-    const rNum = parseInt(rightId, 16);
-    const lName = getChannelName(lNum);
-    const rName = getChannelName(rNum);
-    if (lName && rName) return `${lName} / ${rName} — Diagram`;
-    return `Diagram Ch ${lNum} (0x${leftId.toUpperCase()}) / Ch ${rNum} (0x${rightId.toUpperCase()})`;
-  }
-  return `Diagram #${seqIndex + 1}`;
-}
-
 function updateSeqLabels(seqIndex) {
   for (const side of ['left', 'right']) {
     const span = document.querySelector(`[data-label-side="${side}"][data-label-seq="${seqIndex}"]`);
     if (span) span.textContent = getSeqLabel(side, seqIndex);
-  }
-  const chartDiv = document.getElementById(`chartCanvas_${seqIndex}`);
-  if (chartDiv) {
-    const labelEl = chartDiv.querySelector('.diagram-label');
-    if (labelEl) labelEl.textContent = getDiagramLabel(seqIndex);
   }
 }
 
