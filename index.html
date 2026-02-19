@@ -17,7 +17,7 @@
   <div class="selector-row">
     <div>
       <label for="templateSelect" class="selector-label">Load Template:</label>
-      <select id="templateSelect" onchange="loadSelectedTemplate(); updateURLParams()">
+      <select id="templateSelect" onchange="loadSelectedTemplate(); buildDynamicFields(); updateURLParams()">
         <option value="">-- Select a Template --</option>
       </select>
     </div>
@@ -71,7 +71,7 @@
 
   <div class="action-buttons">
     <button onclick="buildDynamicFields()">Parse & Build Dynamic Fields</button>
-    <button onclick="clearAllFields()">Clear All</button>
+    <button onclick="clearAllFields(); buildDynamicFields()">Clear All</button>
     <button onclick="copyAllFields()" title="Copy all four fields as JSON to clipboard">Copy All</button>
     <button onclick="pasteAllFields()" title="Paste JSON with all four fields from clipboard">Paste All</button>
   </div>

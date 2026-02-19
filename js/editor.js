@@ -40,11 +40,8 @@ function renderHexEditor(container, side, seqIndex, seq) {
   textarea.className = 'hex-editor';
   textarea.oninput = (e) => {
     sideData[side].sequences[seqIndex] = stringToSequence(e.target.value);
-    reAssembleBytes(side);
-    onDataEdited();
-    updateSingleDiagram(seqIndex);
+    applySequenceEdit(side, seqIndex);
     updateSeqLabels(seqIndex);
-    updateVisuals(currentAnimTime);
   };
   container.appendChild(textarea);
 }
@@ -160,6 +157,13 @@ function renderVisualEditor(container, side, seqIndex, seq) {
   container.appendChild(editorDiv);
 }
 
+function applySequenceEdit(side, seqIndex) {
+  reAssembleBytes(side);
+  onDataEdited();
+  updateSingleDiagram(seqIndex);
+  updateVisuals(currentAnimTime);
+}
+
 function copySequence(fromSide, seqIndex) {
   const toSide = fromSide === 'left' ? 'right' : 'left';
   const fromSeq = sideData[fromSide].sequences[seqIndex];
@@ -172,12 +176,8 @@ function copySequence(fromSide, seqIndex) {
     data: [...fromSeq.data]
   };
 
-  reAssembleBytes(toSide);
-  onDataEdited();
-
+  applySequenceEdit(toSide, seqIndex);
   renderSequenceEditor(toSide, seqIndex);
-  updateSingleDiagram(seqIndex);
-  updateVisuals(currentAnimTime);
 }
 
 function updateStepValue(side, seqIndex, stepIndex, type, value) {
@@ -190,10 +190,7 @@ function updateStepValue(side, seqIndex, stepIndex, type, value) {
 
     seq.lengthVal = Math.floor(seq.data.length / 2);
 
-    reAssembleBytes(side);
-    onDataEdited();
-    updateSingleDiagram(seqIndex);
-    updateVisuals(currentAnimTime);
+    applySequenceEdit(side, seqIndex);
   }
 }
 
@@ -204,10 +201,7 @@ function addStep(side, seqIndex) {
   seq.data.push('0A', '00');
   seq.lengthVal = Math.floor(seq.data.length / 2);
 
-  reAssembleBytes(side);
-  onDataEdited();
-  updateSingleDiagram(seqIndex);
-  updateVisuals(currentAnimTime);
+  applySequenceEdit(side, seqIndex);
   renderSequenceEditor(side, seqIndex);
 }
 
@@ -220,10 +214,7 @@ function removeStep(side, seqIndex, stepIndex) {
     seq.data.splice(dataIdx, 2);
     seq.lengthVal = Math.floor(seq.data.length / 2);
 
-    reAssembleBytes(side);
-    onDataEdited();
-    updateSingleDiagram(seqIndex);
-    updateVisuals(currentAnimTime);
+    applySequenceEdit(side, seqIndex);
     renderSequenceEditor(side, seqIndex);
   }
 }

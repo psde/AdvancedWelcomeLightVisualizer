@@ -89,7 +89,7 @@ function parseAllSequencesFromBytes(arr1, arr2) {
 
   // Collect unparsed trailing bytes as RAW
   const leftover = combined.slice(idx);
-  const hasContent = leftover.some(b => b !== "00" && b !== "0");
+  const hasContent = leftover.some(b => b !== "00");
   if (hasContent) {
     seqs.push({ identifier: RAW_IDENTIFIER, lengthVal: leftover.length, data: leftover });
   }

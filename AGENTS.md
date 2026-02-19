@@ -118,9 +118,4 @@ Key global state: `sideData.left.staging1Bytes`, `sideData.left.staging2Bytes`, 
 
 ## Known Technical Debt
 
-- **Duplicate logic**: `getPhysicalLightBrightness` & `getPhysicalLightSource` in animation.js (~95 lines duplicated) — extract shared phase-finding logic
-- **Massive functions**: `createSingleChart` (197 lines) and `createSummaryChart` (218 lines) in chart.js with ~90% shared p5 scaffold — extract chart factory
-- **Duplicate init functions**: `initTemplates` / `initVehicles` in init.js are nearly identical — extract generic `initializeSelect()`
 - **Global state encapsulation**: 7 mutable animation globals, `editModes`, `chartSketches` — consider wrapping in objects/closures
-- **Redundant `buildDynamicFields()` call** in `window.onload` (already called by `loadSelectedTemplate`)
-- **core.js `hasContent` check**: `b !== "0"` condition is unreachable — should be just `b !== "00"`

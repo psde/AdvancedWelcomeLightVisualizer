@@ -130,20 +130,7 @@ function drawPerLightBoundaries(sketch, margin, w, h, maxTime, physicalChId, con
   if (!currentPhaseTimeline) return;
 
   const timeline = currentPhaseTimeline;
-
-  // Gather controlling channels sorted by phase order
-  const controllingChannels = [physicalChId];
-  for (const ch of config.channels) {
-    if (ch.physicalLight === physicalChId) {
-      controllingChannels.push(ch.id);
-    }
-  }
-
-  controllingChannels.sort((a, b) => {
-    const phaseA = timeline.channelPhaseMap[a] !== undefined ? timeline.channelPhaseMap[a] : -1;
-    const phaseB = timeline.channelPhaseMap[b] !== undefined ? timeline.channelPhaseMap[b] : -1;
-    return phaseA - phaseB;
-  });
+  const controllingChannels = getControllingChannelsSorted(physicalChId, config, timeline);
 
   // Compute boundaries per controlling channel
   const boundaries = [];
@@ -246,22 +233,24 @@ function drawPositionIndicator(sketch, margin, w, h, maxTime) {
   }
 }
 
-function createSingleChart(seqIndex, containerDiv) {
+// Shared p5 scaffold: canvas setup, resize handling, and chart interaction (seek + light focus).
+// drawFn(sketch, margin, w, h) must return the current maxTime used by the chart.
+// getFocusElementsFn() must return the DOM elements to highlight on interaction.
+function createChartBase(containerDiv, drawFn, getFocusElementsFn) {
   return new p5((sketch) => {
-    let maxTime = 0;
-    let margin = 40;
+    const margin = 40;
     let w = 0;
     let h = 0;
+    let maxTime = 0;
+    let isDragging = false;
 
     sketch.setup = () => {
       const canvasWidth = containerDiv.clientWidth;
       const canvasHeight = containerDiv.clientHeight || 250;
       const canvas = sketch.createCanvas(canvasWidth, canvasHeight);
       canvas.parent(containerDiv);
-
       w = sketch.width - 2 * margin;
       h = sketch.height - 2 * margin;
-
       canvas.mousePressed(() => {
         isDragging = true;
         handleInteraction();
@@ -275,400 +264,314 @@ function createSingleChart(seqIndex, containerDiv) {
     };
 
     sketch.draw = () => {
-      sketch.background(255);
-      const leftSeq = sideData.left.sequences[seqIndex];
-      const rightSeq = sideData.right.sequences[seqIndex];
-      const leftData = parseForChart(leftSeq);
-      const rightData = parseForChart(rightSeq);
-
-      // Apply phase time offset to chart data
-      const phaseOffset = getChannelPhaseOffset(seqIndex);
-
-      if (phaseOffset > 0) {
-        leftData.points = leftData.points.map(p => ({ t: p.t + phaseOffset, b: p.b }));
-        leftData.maxT += phaseOffset;
-        rightData.points = rightData.points.map(p => ({ t: p.t + phaseOffset, b: p.b }));
-        rightData.maxT += phaseOffset;
-      }
-
-      const localMax = Math.max(leftData.maxT, rightData.maxT);
-      maxTime = getChartMaxTime(localMax);
-      if (maxTime === 0) maxTime = 1000;
-
-      drawChartFrame(sketch, margin, w, h, maxTime);
-
-      drawPhaseBoundaries(sketch, margin, w, h, maxTime);
-
-      // Draw default brightness reference line if applicable
-      if (currentPhaseTimeline) {
-        const seq = leftSeq || rightSeq;
-        if (seq && seq.identifier !== RAW_IDENTIFIER) {
-          const chId = parseInt(seq.identifier, 16);
-          const vehicleKey = document.getElementById("vehicleSelect").value;
-          const config = VEHICLE_CONFIGS[vehicleKey];
-
-          if (config && config.defaultStates && config.defaultStates[chId]) {
-            const defaultBri = config.defaultStates[chId].brightness;
-            const y = sketch.map(defaultBri, 0, 100, margin + h, margin);
-            sketch.stroke(150, 150, 150);
-            sketch.strokeWeight(1);
-            sketch.drawingContext.setLineDash([3, 3]);
-            sketch.line(margin, y, margin + w, y);
-            sketch.drawingContext.setLineDash([]);
-          }
-
-          // Phase 2 channels with physicalLight start from default brightness
-          if (config) {
-            const chConfig = config.channels && config.channels.find(c => c.id === chId);
-            if (chConfig && chConfig.physicalLight && config.defaultStates) {
-              const defaultBri = (config.defaultStates[chConfig.physicalLight] || {}).brightness || 0;
-              if (defaultBri > 0) {
-                const y = sketch.map(defaultBri, 0, 100, margin + h, margin);
-                sketch.stroke(150, 150, 150);
-                sketch.strokeWeight(1);
-                sketch.drawingContext.setLineDash([3, 3]);
-                sketch.line(margin, y, margin + w, y);
-                sketch.drawingContext.setLineDash([]);
-              }
-              if (leftData.points.length > 0) leftData.points[0].b = defaultBri;
-              if (rightData.points.length > 0) rightData.points[0].b = defaultBri;
-            }
-          }
-        }
-      }
-
-      const drawLine = (pts, color) => {
-        if (!pts || pts.length === 0) return;
-        sketch.stroke(color);
-        sketch.strokeWeight(2);
-        sketch.noFill();
-        sketch.beginShape();
-        for (const p of pts) {
-          const x = sketch.map(p.t, 0, maxTime, margin, margin + w);
-          const y = sketch.map(p.b, 0, 100, margin + h, margin);
-          sketch.vertex(x, y);
-        }
-        sketch.endShape();
-      };
-
-      const drawSegment = (p1, p2, color) => {
-        sketch.stroke(color);
-        sketch.strokeWeight(2);
-        sketch.noFill();
-        const x1 = sketch.map(p1.t, 0, maxTime, margin, margin + w);
-        const y1 = sketch.map(p1.b, 0, 100, margin + h, margin);
-        const x2 = sketch.map(p2.t, 0, maxTime, margin, margin + w);
-        const y2 = sketch.map(p2.b, 0, 100, margin + h, margin);
-        sketch.line(x1, y1, x2, y2);
-      };
-
-      // Draw brightness curves with L/R color coding
-      if (arePointsIdentical(leftData.points, rightData.points)) {
-        drawLine(leftData.points, sketch.color(0, 180, 0)); // Green = identical
-      } else {
-        const lp = leftData.points;
-        const rp = rightData.points;
-        const maxPts = Math.max(lp.length, rp.length);
-
-        for (let s = 0; s < maxPts - 1; s++) {
-          const lHas = s + 1 < lp.length;
-          const rHas = s + 1 < rp.length;
-          const bothMatch = lHas && rHas &&
-            lp[s].t === rp[s].t && lp[s].b === rp[s].b &&
-            lp[s + 1].t === rp[s + 1].t && lp[s + 1].b === rp[s + 1].b;
-
-          if (bothMatch) {
-            drawSegment(lp[s], lp[s + 1], sketch.color(0, 180, 0));
-          } else {
-            if (lHas) drawSegment(lp[s], lp[s + 1], sketch.color(0, 0, 255));
-            if (rHas) drawSegment(rp[s], rp[s + 1], sketch.color(255, 0, 0));
-          }
-        }
-      }
-
-      drawPositionIndicator(sketch, margin, w, h, maxTime);
+      maxTime = drawFn(sketch, margin, w, h) || maxTime;
     };
 
-    let isDragging = false;
-
     const handleInteraction = () => {
-      if (sketch.mouseX >= 0 && sketch.mouseX <= sketch.width &&
-        sketch.mouseY >= 0 && sketch.mouseY <= sketch.height) {
-        if (sketch.mouseX >= margin && sketch.mouseX <= margin + w) {
-          let clickedTime = sketch.map(sketch.mouseX, margin, margin + w, 0, maxTime);
-          if (clickedTime < 0) clickedTime = 0;
-          if (clickedTime > maxTime) clickedTime = maxTime;
+      if (sketch.mouseX < 0 || sketch.mouseX > sketch.width ||
+          sketch.mouseY < 0 || sketch.mouseY > sketch.height) return;
+      if (sketch.mouseX < margin || sketch.mouseX > margin + w) return;
 
-          seekAnimation(clickedTime);
-
-          const seq = sideData['left'].sequences[seqIndex] || sideData['right'].sequences[seqIndex];
-          const leftLight = getLightElement('left', seq, seqIndex);
-          const rightLight = getLightElement('right', seq, seqIndex);
-          if (leftLight) leftLight.classList.add('focused');
-          if (rightLight) rightLight.classList.add('focused');
-
-          return false;
-        }
-      }
+      let clickedTime = sketch.map(sketch.mouseX, margin, margin + w, 0, maxTime);
+      clickedTime = Math.max(0, Math.min(maxTime, clickedTime));
+      seekAnimation(clickedTime);
+      for (const el of getFocusElementsFn()) el.classList.add('focused');
+      return false;
     };
 
     const clearInteraction = () => {
-      const seq = sideData['left'].sequences[seqIndex] || sideData['right'].sequences[seqIndex];
-      const leftLight = getLightElement('left', seq, seqIndex);
-      const rightLight = getLightElement('right', seq, seqIndex);
-      if (leftLight) leftLight.classList.remove('focused');
-      if (rightLight) rightLight.classList.remove('focused');
+      for (const el of getFocusElementsFn()) el.classList.remove('focused');
     };
 
-    sketch.mouseDragged = () => {
-      if (isDragging) {
-        handleInteraction();
-      }
-    };
-
+    sketch.mouseDragged = () => { if (isDragging) handleInteraction(); };
     sketch.mouseReleased = () => {
-      if (isDragging) {
-        isDragging = false;
-        clearInteraction();
-      }
+      if (isDragging) { isDragging = false; clearInteraction(); }
     };
-
   });
 }
 
-function createSummaryChart(physicalChId, containerDiv, config) {
-  return new p5((sketch) => {
-    let maxTime = 0;
-    let margin = 40;
-    let w = 0;
-    let h = 0;
+function createSingleChart(seqIndex, containerDiv) {
+  const getFocusElements = () => {
+    const seq = sideData.left.sequences[seqIndex] || sideData.right.sequences[seqIndex];
+    return ['left', 'right'].map(s => getLightElement(s, seq, seqIndex)).filter(Boolean);
+  };
 
-    sketch.setup = () => {
-      const canvasWidth = containerDiv.clientWidth;
-      const canvasHeight = containerDiv.clientHeight || 250;
-      const canvas = sketch.createCanvas(canvasWidth, canvasHeight);
-      canvas.parent(containerDiv);
+  return createChartBase(containerDiv, (sketch, margin, w, h) => {
+    sketch.background(255);
+    const leftSeq = sideData.left.sequences[seqIndex];
+    const rightSeq = sideData.right.sequences[seqIndex];
+    const leftData = parseForChart(leftSeq);
+    const rightData = parseForChart(rightSeq);
 
-      w = sketch.width - 2 * margin;
-      h = sketch.height - 2 * margin;
+    // Apply phase time offset to chart data
+    const phaseOffset = getChannelPhaseOffset(seqIndex);
+    if (phaseOffset > 0) {
+      leftData.points = leftData.points.map(p => ({ t: p.t + phaseOffset, b: p.b }));
+      leftData.maxT += phaseOffset;
+      rightData.points = rightData.points.map(p => ({ t: p.t + phaseOffset, b: p.b }));
+      rightData.maxT += phaseOffset;
+    }
 
-      canvas.mousePressed(() => {
-        isDragging = true;
-        handleInteraction();
-      });
-    };
+    const localMax = Math.max(leftData.maxT, rightData.maxT);
+    const maxTime = getChartMaxTime(localMax) || 1000;
 
-    sketch.windowResized = () => {
-      const canvasWidth = containerDiv.clientWidth;
-      sketch.resizeCanvas(canvasWidth, sketch.height);
-      w = sketch.width - 2 * margin;
-    };
+    drawChartFrame(sketch, margin, w, h, maxTime);
+    drawPhaseBoundaries(sketch, margin, w, h, maxTime);
 
-    sketch.draw = () => {
-      sketch.background(250, 248, 245);
-      if (!currentPhaseTimeline) return;
+    // Draw default brightness reference line if applicable
+    if (currentPhaseTimeline) {
+      const seq = leftSeq || rightSeq;
+      if (seq && seq.identifier !== RAW_IDENTIFIER) {
+        const chId = parseInt(seq.identifier, 16);
+        const vehicleKey = document.getElementById("vehicleSelect").value;
+        const config = VEHICLE_CONFIGS[vehicleKey];
 
-      maxTime = currentPhaseTimeline.totalDuration;
-      if (maxTime === 0) maxTime = 1000;
-
-      drawChartFrame(sketch, margin, w, h, maxTime);
-      drawPerLightBoundaries(sketch, margin, w, h, maxTime, physicalChId, config);
-
-      // Build sample times: regular intervals + exact sequence keyframe times
-      const sampleCount = Math.min(w, 500);
-      const regularStep = maxTime / sampleCount;
-      const sampleTimes = new Set();
-      for (let i = 0; i <= sampleCount; i++) {
-        sampleTimes.add(i * regularStep);
-      }
-
-      // Add exact keyframe times from all controlling channels
-      const controllingIds = [physicalChId];
-      for (const ch of config.channels) {
-        if (ch.physicalLight === physicalChId) controllingIds.push(ch.id);
-      }
-      for (const chId of controllingIds) {
-        const phaseIdx = currentPhaseTimeline.channelPhaseMap[chId];
-        if (phaseIdx === undefined) continue;
-        const phase = currentPhaseTimeline.phases[phaseIdx];
-        for (const side of ['left', 'right']) {
-          const seq = findSequenceByChannelId(side, chId);
-          if (!seq || seq.identifier === RAW_IDENTIFIER) continue;
-          let cumTime = phase.start;
-          for (let di = 0; di < seq.data.length; di += 2) {
-            const durHex = parseInt(seq.data[di], 16) || 0;
-            cumTime += durHex * 20;
-            if (cumTime <= maxTime) sampleTimes.add(cumTime);
-          }
-        }
-      }
-
-      const sortedTimes = Array.from(sampleTimes).sort((a, b) => a - b);
-
-      const leftPoints = [];
-      const rightPoints = [];
-
-      for (const t of sortedTimes) {
-        leftPoints.push({
-          t,
-          b: getPhysicalLightBrightness(physicalChId, t, 'left', config),
-          src: getPhysicalLightSource(physicalChId, t, 'left', config)
-        });
-        rightPoints.push({
-          t,
-          b: getPhysicalLightBrightness(physicalChId, t, 'right', config),
-          src: getPhysicalLightSource(physicalChId, t, 'right', config)
-        });
-      }
-
-      const defaults = config.defaultStates || {};
-      if (defaults[physicalChId]) {
-        const defaultBri = defaults[physicalChId].brightness;
-        if (defaultBri > 0) {
+        if (config && config.defaultStates && config.defaultStates[chId]) {
+          const defaultBri = config.defaultStates[chId].brightness;
           const y = sketch.map(defaultBri, 0, 100, margin + h, margin);
           sketch.stroke(150, 150, 150);
           sketch.strokeWeight(1);
           sketch.drawingContext.setLineDash([3, 3]);
           sketch.line(margin, y, margin + w, y);
           sketch.drawingContext.setLineDash([]);
-          sketch.noStroke();
-          sketch.fill(150);
-          sketch.textAlign(sketch.LEFT, sketch.BOTTOM);
-          sketch.textSize(9);
-          sketch.text(`Default: ${defaultBri}%`, margin + 3, y - 2);
-          sketch.textSize(11);
+        }
+
+        // Phase 2 channels with physicalLight start from default brightness
+        if (config) {
+          const chConfig = config.channels && config.channels.find(c => c.id === chId);
+          if (chConfig && chConfig.physicalLight && config.defaultStates) {
+            const defaultBri = (config.defaultStates[chConfig.physicalLight] || {}).brightness || 0;
+            if (defaultBri > 0) {
+              const y = sketch.map(defaultBri, 0, 100, margin + h, margin);
+              sketch.stroke(150, 150, 150);
+              sketch.strokeWeight(1);
+              sketch.drawingContext.setLineDash([3, 3]);
+              sketch.line(margin, y, margin + w, y);
+              sketch.drawingContext.setLineDash([]);
+            }
+            if (leftData.points.length > 0) leftData.points[0].b = defaultBri;
+            if (rightData.points.length > 0) rightData.points[0].b = defaultBri;
+          }
         }
       }
+    }
 
-      // Per-segment comparison: classify each segment by source type AND L/R match.
-      // Group consecutive segments with same classification into polyline runs
-      // so setLineDash renders correctly across the full span.
-      const isDefaultSource = (src) => src === 'default' || src === 'rampUp' || src === 'rampDown';
-      const briMatch = (i) => Math.abs(leftPoints[i].b - rightPoints[i].b) < 0.01;
-
-      const segCount = leftPoints.length - 1;
-      const segClass = [];
-      for (let i = 0; i < segCount; i++) {
-        const isDef = isDefaultSource(leftPoints[i].src) || isDefaultSource(rightPoints[i].src);
-        const isMatch = briMatch(i) && briMatch(i + 1);
-        segClass.push({ isDef, isMatch });
+    const drawLine = (pts, color) => {
+      if (!pts || pts.length === 0) return;
+      sketch.stroke(color);
+      sketch.strokeWeight(2);
+      sketch.noFill();
+      sketch.beginShape();
+      for (const p of pts) {
+        const x = sketch.map(p.t, 0, maxTime, margin, margin + w);
+        const y = sketch.map(p.b, 0, 100, margin + h, margin);
+        sketch.vertex(x, y);
       }
+      sketch.endShape();
+    };
 
-      const greenColor = sketch.color(0, 180, 0);
-      const blueColor = sketch.color(0, 0, 255);
-      const redColor = sketch.color(255, 0, 0);
+    const drawSegment = (p1, p2, color) => {
+      sketch.stroke(color);
+      sketch.strokeWeight(2);
+      sketch.noFill();
+      const x1 = sketch.map(p1.t, 0, maxTime, margin, margin + w);
+      const y1 = sketch.map(p1.b, 0, 100, margin + h, margin);
+      const x2 = sketch.map(p2.t, 0, maxTime, margin, margin + w);
+      const y2 = sketch.map(p2.b, 0, 100, margin + h, margin);
+      sketch.line(x1, y1, x2, y2);
+    };
 
-      const drawRun = (pts, startSeg, endSeg, color, isDef) => {
-        sketch.stroke(color);
-        sketch.strokeWeight(2);
-        sketch.noFill();
-        sketch.drawingContext.setLineDash(isDef ? [6, 4] : []);
-        sketch.beginShape();
-        for (let i = startSeg; i <= endSeg; i++) {
-          const x = sketch.map(pts[i].t, 0, maxTime, margin, margin + w);
-          const y = sketch.map(pts[i].b, 0, 100, margin + h, margin);
-          sketch.vertex(x, y);
-        }
-        sketch.endShape();
-      };
+    // Draw brightness curves with L/R color coding
+    if (arePointsIdentical(leftData.points, rightData.points)) {
+      drawLine(leftData.points, sketch.color(0, 180, 0)); // Green = identical
+    } else {
+      const lp = leftData.points;
+      const rp = rightData.points;
+      const maxPts = Math.max(lp.length, rp.length);
 
-      let runStart = 0;
-      while (runStart < segCount) {
-        const { isDef, isMatch } = segClass[runStart];
-        let runEnd = runStart;
-        while (runEnd + 1 < segCount &&
-               segClass[runEnd + 1].isDef === isDef &&
-               segClass[runEnd + 1].isMatch === isMatch) {
-          runEnd++;
-        }
+      for (let s = 0; s < maxPts - 1; s++) {
+        const lHas = s + 1 < lp.length;
+        const rHas = s + 1 < rp.length;
+        const bothMatch = lHas && rHas &&
+          lp[s].t === rp[s].t && lp[s].b === rp[s].b &&
+          lp[s + 1].t === rp[s + 1].t && lp[s + 1].b === rp[s + 1].b;
 
-        if (isMatch) {
-          drawRun(leftPoints, runStart, runEnd + 1, greenColor, isDef);
+        if (bothMatch) {
+          drawSegment(lp[s], lp[s + 1], sketch.color(0, 180, 0));
         } else {
-          drawRun(leftPoints, runStart, runEnd + 1, blueColor, isDef);
-          drawRun(rightPoints, runStart, runEnd + 1, redColor, isDef);
+          if (lHas) drawSegment(lp[s], lp[s + 1], sketch.color(0, 0, 255));
+          if (rHas) drawSegment(rp[s], rp[s + 1], sketch.color(255, 0, 0));
         }
-
-        runStart = runEnd + 1;
       }
-      sketch.drawingContext.setLineDash([]);
+    }
 
-      // Legend for channel vs default line styles
-      const hasDefault = leftPoints.some(p => isDefaultSource(p.src))
-        || rightPoints.some(p => isDefaultSource(p.src));
-      if (hasDefault) {
-        const lx = margin + w - 105;
-        const ly = margin + h - 22;
-        sketch.noStroke();
-        sketch.fill(255, 255, 255, 200);
-        sketch.rect(lx - 4, ly - 2, 110, 20, 3);
+    drawPositionIndicator(sketch, margin, w, h, maxTime);
+    return maxTime;
+  }, getFocusElements);
+}
 
-        sketch.stroke(greenColor);
-        sketch.strokeWeight(2);
+function createSummaryChart(physicalChId, containerDiv, config) {
+  const getFocusElements = () =>
+    ['left', 'right'].map(s => document.getElementById(`${s}_light_ch${physicalChId}`)).filter(Boolean);
+
+  return createChartBase(containerDiv, (sketch, margin, w, h) => {
+    sketch.background(250, 248, 245);
+    if (!currentPhaseTimeline) return 1000;
+
+    const maxTime = currentPhaseTimeline.totalDuration || 1000;
+
+    drawChartFrame(sketch, margin, w, h, maxTime);
+    drawPerLightBoundaries(sketch, margin, w, h, maxTime, physicalChId, config);
+
+    // Build sample times: regular intervals + exact sequence keyframe times
+    const sampleCount = Math.min(w, 500);
+    const regularStep = maxTime / sampleCount;
+    const sampleTimes = new Set();
+    for (let i = 0; i <= sampleCount; i++) {
+      sampleTimes.add(i * regularStep);
+    }
+
+    // Add exact keyframe times from all controlling channels
+    const controllingIds = getControllingChannelsSorted(physicalChId, config, currentPhaseTimeline);
+    for (const chId of controllingIds) {
+      const phaseIdx = currentPhaseTimeline.channelPhaseMap[chId];
+      if (phaseIdx === undefined) continue;
+      const phase = currentPhaseTimeline.phases[phaseIdx];
+      for (const side of ['left', 'right']) {
+        const seq = findSequenceByChannelId(side, chId);
+        if (!seq || seq.identifier === RAW_IDENTIFIER) continue;
+        let cumTime = phase.start;
+        for (let di = 0; di < seq.data.length; di += 2) {
+          const durHex = parseInt(seq.data[di], 16) || 0;
+          cumTime += durHex * 20;
+          if (cumTime <= maxTime) sampleTimes.add(cumTime);
+        }
+      }
+    }
+
+    const sortedTimes = Array.from(sampleTimes).sort((a, b) => a - b);
+
+    const leftPoints = [];
+    const rightPoints = [];
+    for (const t of sortedTimes) {
+      leftPoints.push({
+        t,
+        b: getPhysicalLightBrightness(physicalChId, t, 'left', config),
+        src: getPhysicalLightSource(physicalChId, t, 'left', config)
+      });
+      rightPoints.push({
+        t,
+        b: getPhysicalLightBrightness(physicalChId, t, 'right', config),
+        src: getPhysicalLightSource(physicalChId, t, 'right', config)
+      });
+    }
+
+    const defaults = config.defaultStates || {};
+    if (defaults[physicalChId]) {
+      const defaultBri = defaults[physicalChId].brightness;
+      if (defaultBri > 0) {
+        const y = sketch.map(defaultBri, 0, 100, margin + h, margin);
+        sketch.stroke(150, 150, 150);
+        sketch.strokeWeight(1);
+        sketch.drawingContext.setLineDash([3, 3]);
+        sketch.line(margin, y, margin + w, y);
         sketch.drawingContext.setLineDash([]);
-        sketch.line(lx, ly + 5, lx + 16, ly + 5);
         sketch.noStroke();
-        sketch.fill(80);
-        sketch.textAlign(sketch.LEFT, sketch.CENTER);
-        sketch.textSize(8);
-        sketch.text('Channel', lx + 19, ly + 5);
-
-        sketch.stroke(greenColor);
-        sketch.strokeWeight(2);
-        sketch.drawingContext.setLineDash([6, 4]);
-        sketch.line(lx + 58, ly + 5, lx + 74, ly + 5);
-        sketch.drawingContext.setLineDash([]);
-        sketch.noStroke();
-        sketch.fill(80);
-        sketch.text('Default', lx + 77, ly + 5);
+        sketch.fill(150);
+        sketch.textAlign(sketch.LEFT, sketch.BOTTOM);
+        sketch.textSize(9);
+        sketch.text(`Default: ${defaultBri}%`, margin + 3, y - 2);
         sketch.textSize(11);
       }
+    }
 
-      drawPositionIndicator(sketch, margin, w, h, maxTime);
-    };
+    // Per-segment comparison: classify each segment by source type AND L/R match.
+    // Group consecutive segments with same classification into polyline runs
+    // so setLineDash renders correctly across the full span.
+    const isDefaultSource = (src) => src === 'default' || src === 'rampUp' || src === 'rampDown';
+    const briMatch = (i) => Math.abs(leftPoints[i].b - rightPoints[i].b) < 0.01;
 
-    let isDragging = false;
+    const segCount = leftPoints.length - 1;
+    const segClass = [];
+    for (let i = 0; i < segCount; i++) {
+      const isDef = isDefaultSource(leftPoints[i].src) || isDefaultSource(rightPoints[i].src);
+      const isMatch = briMatch(i) && briMatch(i + 1);
+      segClass.push({ isDef, isMatch });
+    }
 
-    const handleInteraction = () => {
-      if (sketch.mouseX >= 0 && sketch.mouseX <= sketch.width &&
-        sketch.mouseY >= 0 && sketch.mouseY <= sketch.height) {
-        if (sketch.mouseX >= margin && sketch.mouseX <= margin + w) {
-          let clickedTime = sketch.map(sketch.mouseX, margin, margin + w, 0, maxTime);
-          if (clickedTime < 0) clickedTime = 0;
-          if (clickedTime > maxTime) clickedTime = maxTime;
+    const greenColor = sketch.color(0, 180, 0);
+    const blueColor = sketch.color(0, 0, 255);
+    const redColor = sketch.color(255, 0, 0);
 
-          seekAnimation(clickedTime);
-
-          for (const side of ['left', 'right']) {
-            const el = document.getElementById(`${side}_light_ch${physicalChId}`);
-            if (el) el.classList.add('focused');
-          }
-
-          return false;
-        }
+    const drawRun = (pts, startSeg, endSeg, color, isDef) => {
+      sketch.stroke(color);
+      sketch.strokeWeight(2);
+      sketch.noFill();
+      sketch.drawingContext.setLineDash(isDef ? [6, 4] : []);
+      sketch.beginShape();
+      for (let i = startSeg; i <= endSeg; i++) {
+        const x = sketch.map(pts[i].t, 0, maxTime, margin, margin + w);
+        const y = sketch.map(pts[i].b, 0, 100, margin + h, margin);
+        sketch.vertex(x, y);
       }
+      sketch.endShape();
     };
 
-    const clearInteraction = () => {
-      for (const side of ['left', 'right']) {
-        const el = document.getElementById(`${side}_light_ch${physicalChId}`);
-        if (el) el.classList.remove('focused');
+    let runStart = 0;
+    while (runStart < segCount) {
+      const { isDef, isMatch } = segClass[runStart];
+      let runEnd = runStart;
+      while (runEnd + 1 < segCount &&
+             segClass[runEnd + 1].isDef === isDef &&
+             segClass[runEnd + 1].isMatch === isMatch) {
+        runEnd++;
       }
-    };
 
-    sketch.mouseDragged = () => {
-      if (isDragging) {
-        handleInteraction();
+      if (isMatch) {
+        drawRun(leftPoints, runStart, runEnd + 1, greenColor, isDef);
+      } else {
+        drawRun(leftPoints, runStart, runEnd + 1, blueColor, isDef);
+        drawRun(rightPoints, runStart, runEnd + 1, redColor, isDef);
       }
-    };
 
-    sketch.mouseReleased = () => {
-      if (isDragging) {
-        isDragging = false;
-        clearInteraction();
-      }
-    };
-  });
+      runStart = runEnd + 1;
+    }
+    sketch.drawingContext.setLineDash([]);
+
+    // Legend for channel vs default line styles
+    const hasDefault = leftPoints.some(p => isDefaultSource(p.src))
+      || rightPoints.some(p => isDefaultSource(p.src));
+    if (hasDefault) {
+      const lx = margin + w - 105;
+      const ly = margin + h - 22;
+      sketch.noStroke();
+      sketch.fill(255, 255, 255, 200);
+      sketch.rect(lx - 4, ly - 2, 110, 20, 3);
+
+      sketch.stroke(greenColor);
+      sketch.strokeWeight(2);
+      sketch.drawingContext.setLineDash([]);
+      sketch.line(lx, ly + 5, lx + 16, ly + 5);
+      sketch.noStroke();
+      sketch.fill(80);
+      sketch.textAlign(sketch.LEFT, sketch.CENTER);
+      sketch.textSize(8);
+      sketch.text('Channel', lx + 19, ly + 5);
+
+      sketch.stroke(greenColor);
+      sketch.strokeWeight(2);
+      sketch.drawingContext.setLineDash([6, 4]);
+      sketch.line(lx + 58, ly + 5, lx + 74, ly + 5);
+      sketch.drawingContext.setLineDash([]);
+      sketch.noStroke();
+      sketch.fill(80);
+      sketch.text('Default', lx + 77, ly + 5);
+      sketch.textSize(11);
+    }
+
+    drawPositionIndicator(sketch, margin, w, h, maxTime);
+    return maxTime;
+  }, getFocusElements);
 }
 
 function getPhysicalLightIds(config) {
