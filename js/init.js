@@ -34,14 +34,18 @@ function copyAllFields() {
     .catch(err => console.error('Failed to copy all fields:', err));
 }
 
+function setStagingFields(left1, left2, right1, right2) {
+  document.getElementById('leftStaging1').value = left1;
+  document.getElementById('leftStaging2').value = left2;
+  document.getElementById('rightStaging1').value = right1;
+  document.getElementById('rightStaging2').value = right2;
+}
+
 function pasteAllFields() {
   navigator.clipboard.readText()
     .then(text => {
       const data = JSON.parse(text);
-      document.getElementById('leftStaging1').value = data.left1 || '';
-      document.getElementById('leftStaging2').value = data.left2 || '';
-      document.getElementById('rightStaging1').value = data.right1 || '';
-      document.getElementById('rightStaging2').value = data.right2 || '';
+      setStagingFields(data.left1 || '', data.left2 || '', data.right1 || '', data.right2 || '');
       buildDynamicFields();
       onDataEdited();
     })
@@ -49,10 +53,7 @@ function pasteAllFields() {
 }
 
 function clearAllFields() {
-  document.getElementById("leftStaging1").value = "";
-  document.getElementById("leftStaging2").value = "";
-  document.getElementById("rightStaging1").value = "";
-  document.getElementById("rightStaging2").value = "";
+  setStagingFields('', '', '', '');
 }
 
 function buildDynamicFields() {
@@ -142,15 +143,12 @@ function restoreFromURLData() {
         binary.charCodeAt(start + i).toString(16).padStart(2, '0').toUpperCase()
       );
 
-    sideData.left.staging1Bytes = toHexArray(0, 252);
-    sideData.left.staging2Bytes = toHexArray(252, 168);
-    sideData.right.staging1Bytes = toHexArray(420, 252);
-    sideData.right.staging2Bytes = toHexArray(672, 168);
-
-    document.getElementById('leftStaging1').value = buildByteString(sideData.left.staging1Bytes);
-    document.getElementById('leftStaging2').value = buildByteString(sideData.left.staging2Bytes);
-    document.getElementById('rightStaging1').value = buildByteString(sideData.right.staging1Bytes);
-    document.getElementById('rightStaging2').value = buildByteString(sideData.right.staging2Bytes);
+    setStagingFields(
+      buildByteString(toHexArray(0, 252)),
+      buildByteString(toHexArray(252, 168)),
+      buildByteString(toHexArray(420, 252)),
+      buildByteString(toHexArray(672, 168))
+    );
 
     return true;
   } catch (e) {
@@ -164,47 +162,37 @@ function getDefault(paramName, configValue) {
   return urlParams.get(paramName) || configValue || "";
 }
 
+function initializeSelect(elementId, dataObj, urlParam, configKey, labelFn) {
+  const select = document.getElementById(elementId);
+  select.innerHTML = '';
+  for (const key of Object.keys(dataObj)) {
+    const option = document.createElement('option');
+    option.value = key;
+    option.textContent = labelFn(key);
+    select.appendChild(option);
+  }
+  const configVal = (typeof APP_CONFIG !== 'undefined') ? APP_CONFIG[configKey] : '';
+  const defaultVal = getDefault(urlParam, configVal);
+  if (defaultVal && dataObj[defaultVal]) {
+    select.value = defaultVal;
+  }
+}
+
 function initTemplates() {
-  const select = document.getElementById('templateSelect');
   if (typeof TEMPLATES === 'undefined') {
     console.warn('TEMPLATES not found. Make sure templates.js is loaded.');
     return;
   }
-
-  for (const key of Object.keys(TEMPLATES)) {
-    const option = document.createElement('option');
-    option.value = key;
-    option.textContent = key;
-    select.appendChild(option);
-  }
-
-  const configVal = (typeof APP_CONFIG !== 'undefined') ? APP_CONFIG.defaultTemplate : "";
-  const defaultTemplate = getDefault('template', configVal);
-  if (defaultTemplate && TEMPLATES[defaultTemplate]) {
-    select.value = defaultTemplate;
-  }
+  initializeSelect('templateSelect', TEMPLATES, 'template', 'defaultTemplate', key => key);
 }
 
 function initVehicles() {
-  const select = document.getElementById('vehicleSelect');
   if (typeof VEHICLE_CONFIGS === 'undefined') {
     console.warn('VEHICLE_CONFIGS not found. Make sure vehicles.js is loaded.');
     return;
   }
-
-  select.innerHTML = "";
-  for (const key of Object.keys(VEHICLE_CONFIGS)) {
-    const option = document.createElement('option');
-    option.value = key;
-    option.textContent = VEHICLE_CONFIGS[key].name || key;
-    select.appendChild(option);
-  }
-
-  const configVal = (typeof APP_CONFIG !== 'undefined') ? APP_CONFIG.defaultVehicle : "";
-  const defaultVehicle = getDefault('vehicle', configVal);
-  if (defaultVehicle && VEHICLE_CONFIGS[defaultVehicle]) {
-    select.value = defaultVehicle;
-  }
+  initializeSelect('vehicleSelect', VEHICLE_CONFIGS, 'vehicle', 'defaultVehicle',
+    key => VEHICLE_CONFIGS[key].name || key);
 }
 
 function loadSelectedTemplate() {
@@ -216,13 +204,7 @@ function loadSelectedTemplate() {
   loadedTemplateKey = key;
 
   const data = TEMPLATES[key];
-
-  document.getElementById('leftStaging1').value = data.left1 || "";
-  document.getElementById('leftStaging2').value = data.left2 || "";
-  document.getElementById('rightStaging1').value = data.right1 || "";
-  document.getElementById('rightStaging2').value = data.right2 || "";
-
-  buildDynamicFields();
+  setStagingFields(data.left1 || '', data.left2 || '', data.right1 || '', data.right2 || '');
 }
 
 window.addEventListener('DOMContentLoaded', initTemplates);

@@ -4,7 +4,6 @@
 <head>
   <meta charset="UTF-8">
   <title>Welcome Light Visualizer v0.1</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
   <script src="templates.js"></script>
   <script src="vehicles.js"></script>
   <script src="config.js"></script>
@@ -17,7 +16,7 @@
   <div class="selector-row">
     <div>
       <label for="templateSelect" class="selector-label">Load Template:</label>
-      <select id="templateSelect" onchange="loadSelectedTemplate(); updateURLParams()">
+      <select id="templateSelect" onchange="loadSelectedTemplate(); buildDynamicFields(); updateURLParams()">
         <option value="">-- Select a Template --</option>
       </select>
     </div>
@@ -71,7 +70,7 @@
 
   <div class="action-buttons">
     <button onclick="buildDynamicFields()">Parse & Build Dynamic Fields</button>
-    <button onclick="clearAllFields()">Clear All</button>
+    <button onclick="clearAllFields(); buildDynamicFields()">Clear All</button>
     <button onclick="copyAllFields()" title="Copy all four fields as JSON to clipboard">Copy All</button>
     <button onclick="pasteAllFields()" title="Paste JSON with all four fields from clipboard">Paste All</button>
   </div>
@@ -113,8 +112,10 @@
 
   <script src="js/core.js"></script>
   <script src="js/animation.js"></script>
+  <script src="js/svg-utils.js"></script>
   <script src="js/chart.js"></script>
   <script src="js/editor.js"></script>
+  <script src="js/timeline.js"></script>
   <script src="js/init.js"></script>
 </body>
 

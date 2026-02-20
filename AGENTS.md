@@ -34,7 +34,9 @@ All template data in `templates.js` must contain only valid two-character hex by
 - **`index.html`** — HTML structure, loads external scripts and stylesheet.
 - **`js/core.js`** — Data model, constants (`MAX_STAGING1`, `MAX_STAGING2`), byte parsing (`parseByteString`, `buildByteString`), sequence parsing (`parseAllSequencesFromBytes`), reassembly (`reAssembleBytes`), string conversion (`sequenceToString`, `stringToSequence`).
 - **`js/animation.js`** — Animation player: playback state, `rebuildAnimationPlayer()`, grid/image visualization, `createSVGShape()` (path/circle/polygon/rect), `getLightElement()`, brightness interpolation (`getBrightnessAtTime`), playback controls.
-- **`js/chart.js`** — p5.js brightness diagrams: `chartSketches`, `parseForChart()`, `arePointsIdentical()`, `createSingleChart()`, `updateSingleDiagram()`.
+- **`js/svg-utils.js`** — Shared SVG constants (`SVG_NS`, `TL_MARGIN`, `TL_HEIGHT`, `SIDE_COLOR_LEFT`, `SIDE_COLOR_RIGHT`, `COLOR_IDENTICAL`), coordinate mapping (`timeToX`, `brightnessToY`), and SVG drawing helpers (`drawFillPolygon`, `drawCurvePolyline`, `drawHandle`).
+- **`js/chart.js`** — Interactive SVG brightness charts: `chartInstances`, `parseForChart()`, `arePointsIdentical()`, `createSequenceChart()`, `createSummaryChart()`, chart edit mode with drag/insert/delete.
+- **`js/timeline.js`** — Single-side SVG timeline editor: `renderTimelineEditor()`, drag handles, keyboard editing, point insert/delete, inspector panel.
 - **`js/editor.js`** — Sequence editors: hex/visual editor rendering, step manipulation, `renderDynamicSequences()`, `createSeqSubblock()`, channel labeling.
 - **`js/init.js`** — Initialization: clipboard helpers, `buildDynamicFields()`, template/vehicle loading, `DOMContentLoaded`/`window.onload` handlers.
 - **`styles.css`** — All CSS styles for the application.
@@ -64,14 +66,14 @@ Key global state: `sideData.left.staging1Bytes`, `sideData.left.staging2Bytes`, 
 
 1. User inputs hex data or loads a template → populates four text areas (Left/Right × Staging1/Staging2)
 2. `buildDynamicFields()` parses bytes into sequence objects
-3. `renderDynamicSequences()` creates per-sequence editors (hex or visual mode) and p5.js brightness diagrams
+3. `renderDynamicSequences()` creates per-sequence editors (hex, visual, or timeline mode) and SVG brightness charts
 4. `rebuildAnimationPlayer()` sets up real-time visualization (grid of bulbs or SVG overlay on vehicle image)
 5. Edits in sequence editors propagate back to byte arrays via `reAssembleBytes(side)`
 6. Animation runs via `requestAnimationFrame` loop, interpolating brightness per channel at current time
 
 ### External Dependencies
 
-- **p5.js v1.4.2** (loaded via CDN) — used for brightness-over-time chart diagrams
+No external runtime dependencies — all charting and visualization is done with native SVG.
 
 ## Key Conventions
 
@@ -118,9 +120,4 @@ Key global state: `sideData.left.staging1Bytes`, `sideData.left.staging2Bytes`, 
 
 ## Known Technical Debt
 
-- **Duplicate logic**: `getPhysicalLightBrightness` & `getPhysicalLightSource` in animation.js (~95 lines duplicated) — extract shared phase-finding logic
-- **Massive functions**: `createSingleChart` (197 lines) and `createSummaryChart` (218 lines) in chart.js with ~90% shared p5 scaffold — extract chart factory
-- **Duplicate init functions**: `initTemplates` / `initVehicles` in init.js are nearly identical — extract generic `initializeSelect()`
-- **Global state encapsulation**: 7 mutable animation globals, `editModes`, `chartSketches` — consider wrapping in objects/closures
-- **Redundant `buildDynamicFields()` call** in `window.onload` (already called by `loadSelectedTemplate`)
-- **core.js `hasContent` check**: `b !== "0"` condition is unreachable — should be just `b !== "00"`
+- **Global state encapsulation**: 7 mutable animation globals, `editModes`, `chartInstances` — consider wrapping in objects/closures

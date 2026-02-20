@@ -112,8 +112,13 @@ button {
   margin-bottom: 5px;
   font-size: 1em;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 6px;
+}
+
+.seq-label-group {
+  flex: 1;
+  min-width: 0;
 }
 
 .seq-subblock-right h4 {
@@ -148,9 +153,9 @@ button {
   border: 1px solid #ccc;
   background-color: #fff;
   width: 100%;
-  height: 250px;
   flex-basis: 100%;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
 }
 
 .animation-player {
@@ -295,9 +300,10 @@ input[type=range] {
 
 /* Visual Editor Styles */
 .editor-toggle {
-  display: flex;
+  display: inline-flex;
   gap: 0;
-  margin-bottom: 8px;
+  margin: 0;
+  flex-shrink: 0;
 }
 
 .editor-toggle button {
@@ -342,18 +348,38 @@ input[type=range] {
   background-color: #fff;
   border: 1px solid #e0e0e0;
   border-radius: 4px;
-  margin-bottom: 6px;
 }
 
-.step-row:last-of-type {
-  margin-bottom: 0;
+.step-controls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .step-label {
   font-weight: bold;
   font-size: 12px;
-  min-width: 50px;
   color: #555;
+  white-space: nowrap;
+  margin-right: 2px;
+}
+
+.step-action-btn {
+  padding: 1px 5px;
+  font-size: 10px;
+  line-height: 1;
+  margin: 0;
+  min-width: 20px;
+  background-color: #6c757d;
+}
+
+.step-action-btn:hover:not(:disabled) {
+  background-color: #5a6268;
+}
+
+.step-action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .step-field {
@@ -398,14 +424,59 @@ input[type=range] {
   border-color: #007bff;
 }
 
-.step-remove {
+.step-action-btn.step-remove {
   background-color: #dc3545;
-  padding: 2px 8px;
-  font-size: 11px;
 }
 
-.step-remove:hover {
+.step-action-btn.step-remove:hover {
   background-color: #c82333;
+}
+
+/* Insert step row between steps */
+.insert-row {
+  display: flex;
+  justify-content: center;
+  margin: 2px 0;
+}
+
+.insert-step-btn {
+  background: transparent;
+  border: 1px dashed #e0e0e0;
+  color: #ccc;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  height: 10px;
+  line-height: 8px;
+  font-size: 10px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.15s;
+}
+
+.insert-step-btn:hover {
+  background-color: #e8f5e9;
+  border-color: #28a745;
+  color: #28a745;
+}
+
+/* Hex editor locked info line */
+.hex-info-line {
+  font-size: 11px;
+  font-family: monospace;
+  color: #666;
+  padding: 4px 6px;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  margin-bottom: 4px;
+}
+
+/* RAW data message in visual mode */
+.raw-data-msg {
+  color: #999;
+  font-size: 12px;
+  margin: 0;
 }
 
 .add-step-btn {
@@ -518,4 +589,239 @@ textarea.overflow-error {
 
 .summary-header {
   margin: 10px 0 5px;
+}
+
+/* Timeline Editor */
+.timeline-wrapper {
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.timeline-editor {
+  display: block;
+  width: 100%;
+  cursor: default;
+  outline: none;
+  background-color: #fff;
+  border-radius: 3px;
+}
+
+.timeline-editor.tl-dragging {
+  cursor: grabbing;
+}
+
+.tl-grid line {
+  shape-rendering: crispEdges;
+}
+
+.tl-grid text {
+  font-family: Arial, sans-serif;
+  user-select: none;
+}
+
+.tl-fill polygon {
+  pointer-events: none;
+}
+
+.tl-curve polyline {
+  pointer-events: none;
+}
+
+.tl-handles circle.tl-handle {
+  cursor: grab;
+  transition: r 0.1s;
+}
+
+.tl-handles circle.tl-handle:hover {
+  r: 8;
+}
+
+.tl-handles circle.tl-handle.selected {
+  r: 9;
+  stroke-width: 3;
+}
+
+.tl-handles circle.tl-origin {
+  cursor: default;
+}
+
+.tl-inspector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  margin-top: 6px;
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.tl-inspector-label {
+  font-weight: bold;
+  color: #555;
+}
+
+.tl-inspector-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #666;
+  font-size: 12px;
+  margin: 0;
+}
+
+.tl-inspector-input {
+  width: 60px;
+  padding: 2px 4px;
+  font-size: 11px;
+  font-family: monospace;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  text-align: right;
+}
+
+.tl-inspector-input:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.tl-inspector-delete {
+  padding: 2px 10px;
+  font-size: 11px;
+  background-color: #dc3545;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  margin: 0 0 0 auto;
+}
+
+.tl-inspector-delete:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.tl-inspector-delete:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* SVG Chart (overlay L/R) */
+.chart-wrapper {
+  position: relative;
+  flex-basis: 100%;
+}
+
+.chart-edit-controls {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+  z-index: 10;
+  align-items: center;
+}
+
+.chart-edit-toggle {
+  padding: 2px 10px;
+  font-size: 11px;
+  background-color: rgba(108, 117, 125, 0.7);
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.chart-edit-toggle:hover {
+  background-color: rgba(90, 98, 104, 0.9);
+}
+
+.chart-edit-toggle.active {
+  background-color: rgba(0, 123, 255, 0.85);
+}
+
+.chart-side-selector {
+  display: inline-flex;
+  gap: 0;
+}
+
+.chart-side-btn {
+  padding: 2px 8px;
+  font-size: 10px;
+  border-radius: 0;
+  margin: 0;
+  background-color: rgba(221, 221, 221, 0.8);
+  color: #333;
+  border: 1px solid #ccc;
+  cursor: pointer;
+}
+
+.chart-side-btn:first-child {
+  border-radius: 3px 0 0 3px;
+}
+
+.chart-side-btn:last-child {
+  border-radius: 0 3px 3px 0;
+}
+
+.chart-side-btn.active {
+  background-color: rgba(0, 123, 255, 0.85);
+  color: #fff;
+  border-color: rgba(0, 123, 255, 0.85);
+}
+
+.chart-svg {
+  display: block;
+  width: 100%;
+  cursor: default;
+  outline: none;
+  background-color: #fff;
+}
+
+.chart-svg.tl-dragging {
+  cursor: grabbing;
+}
+
+.summary-chart-svg {
+  background-color: #faf6f1;
+}
+
+.chart-fill-area {
+  pointer-events: none;
+}
+
+.chart-curve {
+  pointer-events: none;
+}
+
+.chart-phase-line {
+  pointer-events: none;
+}
+
+.chart-phase-label {
+  user-select: none;
+  pointer-events: none;
+}
+
+.chart-ref-line {
+  pointer-events: none;
+}
+
+.chart-focused-step line,
+.chart-focused-step circle,
+.chart-focused-step text {
+  pointer-events: none;
+}
+
+.chart-position line,
+.chart-position polygon {
+  pointer-events: none;
+}
+
+.chart-inspector {
+  margin-top: 6px;
 }
