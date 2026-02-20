@@ -229,7 +229,19 @@ function updateControls(time) {
 
 function getLightElement(side, seq, idx) {
   if (seq && seq.identifier !== RAW_IDENTIFIER) {
-    const el = document.getElementById(`${side}_light_ch${parseInt(seq.identifier, 16)}`);
+    const channelId = parseInt(seq.identifier, 16);
+
+    // Resolve physicalLight alias to referenced channel's SVG element
+    const config = getActiveVehicleConfig();
+    if (config && config.channels) {
+      const channel = config.channels.find(ch => ch.id === channelId);
+      if (channel && channel.physicalLight) {
+        const el = document.getElementById(`${side}_light_ch${channel.physicalLight}`);
+        if (el) return el;
+      }
+    }
+
+    const el = document.getElementById(`${side}_light_ch${channelId}`);
     if (el) return el;
   }
   return document.getElementById(`${side}_light_${idx}`);

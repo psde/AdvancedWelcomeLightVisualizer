@@ -556,6 +556,15 @@ function updateSequenceChart(seqIndex) {
   }
 }
 
+function updateSummaryCharts() {
+  for (const chart of summaryChartInstances) {
+    const svgWidth = chart.svg.getBoundingClientRect().width;
+    if (svgWidth > 0) {
+      renderSummaryChartContent(chart, svgWidth);
+    }
+  }
+}
+
 // ============================================================================
 // Summary Charts (SVG, read-only)
 // ============================================================================
@@ -1115,6 +1124,28 @@ function wireChartEditInteractions(chart) {
 
     chartDragState.rawTime = rawTime;
     chartDragState.rawBri = rawBri;
+
+    // Live update curves and fills
+    const { leftData, rightData, maxTime: chartMaxTime } = getChartData(seqIndex);
+    const adjustedTime = rawTime + phaseOffset;
+
+    if (handleSide === 'both' || handleSide === 'left') {
+      if (pointIndex < leftData.points.length) {
+        leftData.points[pointIndex] = { t: adjustedTime, b: rawBri };
+      }
+    }
+    if (handleSide === 'both' || handleSide === 'right') {
+      if (pointIndex < rightData.points.length) {
+        rightData.points[pointIndex] = { t: adjustedTime, b: rawBri };
+      }
+    }
+
+    chart.fillGroup.innerHTML = '';
+    drawChartFill(chart.fillGroup, leftData.points, chartMaxTime, chart.plotWidth, chart.plotHeight, SIDE_COLOR_LEFT);
+    drawChartFill(chart.fillGroup, rightData.points, chartMaxTime, chart.plotWidth, chart.plotHeight, SIDE_COLOR_RIGHT);
+
+    chart.curveGroup.innerHTML = '';
+    drawOverlayCurves(chart.curveGroup, leftData.points, rightData.points, chartMaxTime, chart.plotWidth, chart.plotHeight);
 
     updateInspectorLive(inspector, rawPoints, pointIndex, rawTime, rawBri);
   };

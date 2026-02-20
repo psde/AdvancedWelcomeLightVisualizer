@@ -302,7 +302,18 @@ function moveStep(side, seqIndex, stepIndex, direction) {
 function applySequenceEdit(side, seqIndex) {
   reAssembleBytes(side);
   onDataEdited();
+
+  // Recompute phase timeline (sequence durations may have changed)
+  const config = getActiveVehicleConfig();
+  if (config) {
+    currentPhaseTimeline = computePhaseTimeline(config, {
+      left: sideData.left.sequences,
+      right: sideData.right.sequences
+    });
+  }
+
   updateSequenceChart(seqIndex);
+  updateSummaryCharts();
   updateVisuals(currentAnimTime);
 }
 

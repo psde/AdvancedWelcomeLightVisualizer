@@ -235,3 +235,79 @@ describe('getPhysicalLightIds', () => {
     assert.deepStrictEqual(getPhysicalLightIds(config), [1]);
   });
 });
+
+// ============================================================================
+// getLightElement
+// ============================================================================
+describe('getLightElement', () => {
+  let origGetById;
+  let origGetActiveVehicleConfig;
+
+  beforeEach(() => {
+    resetGlobalState();
+    origGetById = document.getElementById;
+    origGetActiveVehicleConfig = globalThis.getActiveVehicleConfig;
+  });
+
+  const afterEach = () => {
+    document.getElementById = origGetById;
+    globalThis.getActiveVehicleConfig = origGetActiveVehicleConfig;
+  };
+
+  it('should return channel element for normal sequence', () => {
+    const fakeEl = { id: 'left_light_ch2' };
+    document.getElementById = (id) => id === 'left_light_ch2' ? fakeEl : null;
+    globalThis.getActiveVehicleConfig = () => null;
+
+    const seq = { identifier: '02', data: [] };
+    const result = getLightElement('left', seq, 0);
+    assert.strictEqual(result, fakeEl);
+    afterEach();
+  });
+
+  it('should resolve physicalLight alias to referenced element', () => {
+    const physicalEl = { id: 'left_light_ch1' };
+    document.getElementById = (id) => id === 'left_light_ch1' ? physicalEl : null;
+    globalThis.getActiveVehicleConfig = () => ({
+      channels: [
+        { id: 1, shapes: [{ type: 'path', d: 'M0 0' }] },
+        { id: 3, physicalLight: 1 }
+      ]
+    });
+
+    const seq = { identifier: '03', data: [] };
+    const result = getLightElement('left', seq, 0);
+    assert.strictEqual(result, physicalEl);
+    afterEach();
+  });
+
+  it('should fall back to index-based element for grid mode', () => {
+    const gridEl = { id: 'left_light_0' };
+    document.getElementById = (id) => id === 'left_light_0' ? gridEl : null;
+    globalThis.getActiveVehicleConfig = () => null;
+
+    const seq = { identifier: '02', data: [] };
+    const result = getLightElement('left', seq, 0);
+    assert.strictEqual(result, gridEl);
+    afterEach();
+  });
+
+  it('should fall back to index-based element for RAW sequence', () => {
+    const gridEl = { id: 'right_light_2' };
+    document.getElementById = (id) => id === 'right_light_2' ? gridEl : null;
+
+    const seq = { identifier: RAW_IDENTIFIER, data: [] };
+    const result = getLightElement('right', seq, 2);
+    assert.strictEqual(result, gridEl);
+    afterEach();
+  });
+
+  it('should fall back to index-based element for null sequence', () => {
+    const gridEl = { id: 'left_light_1' };
+    document.getElementById = (id) => id === 'left_light_1' ? gridEl : null;
+
+    const result = getLightElement('left', null, 1);
+    assert.strictEqual(result, gridEl);
+    afterEach();
+  });
+});
