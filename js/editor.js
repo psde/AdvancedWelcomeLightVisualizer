@@ -154,7 +154,7 @@ function renderVisualEditor(container, side, seqIndex, seq, scrollBehavior) {
       <label>Duration:</label>
       <input type="range" min="0" max="255" value="${step.duration}"
              data-side="${side}" data-seq="${seqIndex}" data-step="${stepIdx}" data-type="duration">
-      <input type="number" min="0" max="5100" step="20" value="${step.duration * 20}"
+      <input type="number" min="0" max="5100" step="20" value="${step.duration * TIME_MULTIPLIER}"
              data-side="${side}" data-seq="${seqIndex}" data-step="${stepIdx}" data-type="duration">
       <span class="value-display">ms</span>
     `;
@@ -187,7 +187,7 @@ function renderVisualEditor(container, side, seqIndex, seq, scrollBehavior) {
     });
 
     editorDiv.appendChild(row);
-    cumulativeTime += step.duration * 20;
+    cumulativeTime += step.duration * TIME_MULTIPLIER;
   });
 
   // Final insert button after last step
@@ -199,17 +199,17 @@ function renderVisualEditor(container, side, seqIndex, seq, scrollBehavior) {
   editorDiv.querySelectorAll('input[type="range"]').forEach(slider => {
     slider.oninput = (e) => {
       const { side: targetSide, seq: seqIdx, step: stepIdx, type } = e.target.dataset;
-      const val = parseInt(e.target.value);
+      const val = parseInt(e.target.value, 10);
 
       const numInput = e.target.nextElementSibling;
       if (type === 'duration') {
-        // Real-world validation: x20 multiplier confirmed (BMW G20 2020)
-        numInput.value = val * 20;
+
+        numInput.value = val * TIME_MULTIPLIER;
       } else {
         numInput.value = val;
       }
 
-      updateStepValue(targetSide, parseInt(seqIdx), parseInt(stepIdx), type, val);
+      updateStepValue(targetSide, parseInt(seqIdx, 10), parseInt(stepIdx, 10), type, val);
     };
   });
 
@@ -217,13 +217,13 @@ function renderVisualEditor(container, side, seqIndex, seq, scrollBehavior) {
   editorDiv.querySelectorAll('input[type="number"]').forEach(numInput => {
     numInput.oninput = (e) => {
       const { side: targetSide, seq: seqIdx, step: stepIdx, type } = e.target.dataset;
-      let inputVal = parseInt(e.target.value) || 0;
+      let inputVal = parseInt(e.target.value, 10) || 0;
 
       let val;
       if (type === 'duration') {
-        // Real-world validation: x20 multiplier confirmed (BMW G20 2020)
+
         inputVal = Math.max(0, Math.min(5100, inputVal));
-        val = Math.round(inputVal / 20);
+        val = Math.round(inputVal / TIME_MULTIPLIER);
       } else {
         val = Math.max(0, Math.min(100, inputVal));
       }
@@ -231,7 +231,7 @@ function renderVisualEditor(container, side, seqIndex, seq, scrollBehavior) {
       const slider = e.target.previousElementSibling;
       slider.value = val;
 
-      updateStepValue(targetSide, parseInt(seqIdx), parseInt(stepIdx), type, val);
+      updateStepValue(targetSide, parseInt(seqIdx, 10), parseInt(stepIdx, 10), type, val);
     };
   });
 
@@ -400,7 +400,7 @@ function renderDynamicSequences() {
   const container = document.getElementById("dynamicContainer");
 
   // Clean up existing chart instances
-  chartInstances = [];
+  cleanupSequenceCharts();
   cleanupSummaryCharts();
 
   const playerDiv = document.getElementById("animationPlayer");
@@ -432,8 +432,7 @@ function renderDynamicSequences() {
 
   renderPhaseTimingSummary(container);
 
-  const vehicleKey = document.getElementById("vehicleSelect") ? document.getElementById("vehicleSelect").value : null;
-  const config = vehicleKey ? VEHICLE_CONFIGS[vehicleKey] : null;
+  const config = getActiveVehicleConfig();
 
   // Build summary charts for physical lights
   if (currentPhaseTimeline && config) {
@@ -501,9 +500,7 @@ function renderDynamicSequences() {
 }
 
 function getChannelName(channelId) {
-  const vehicleSelect = document.getElementById("vehicleSelect");
-  if (!vehicleSelect) return null;
-  const config = VEHICLE_CONFIGS[vehicleSelect.value];
+  const config = getActiveVehicleConfig();
   if (!config || !config.channels) return null;
   const channel = config.channels.find(ch => ch.id === channelId);
   return channel ? channel.label : null;

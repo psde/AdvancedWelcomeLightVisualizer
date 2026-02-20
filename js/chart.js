@@ -13,8 +13,7 @@ function parseForChart(seq) {
   for (let i = 0; i < seq.data.length; i += 2) {
     const durationHex = parseInt(seq.data[i], 16) || 0;
     const brightnessHex = parseInt(seq.data[i + 1], 16) || 0;
-    // Real-world validation: 60fps recordings confirmed ×20 multiplier (BMW G20 2020)
-    sumT += durationHex * 20;
+    sumT += durationHex * TIME_MULTIPLIER;
     const bri = Math.min(brightnessHex, 100);
     points.push({ t: sumT, b: bri });
   }
@@ -51,17 +50,6 @@ function getChartMaxTime(localMaxT) {
   return localMaxT;
 }
 
-function getPhysicalLightIds(config) {
-  if (!config || !config.channels) return [];
-  const ids = [];
-  for (const ch of config.channels) {
-    if (!ch.physicalLight && (ch.shapes || ch.type)) {
-      ids.push(ch.id);
-    }
-  }
-  return ids;
-}
-
 // ============================================================================
 // SVG Chart Rendering
 // ============================================================================
@@ -86,14 +74,13 @@ function getChartData(seqIndex) {
     const seq = leftSeq || rightSeq;
     if (seq && seq.identifier !== RAW_IDENTIFIER) {
       const chId = parseInt(seq.identifier, 16);
-      const vehicleKey = document.getElementById("vehicleSelect").value;
-      const config = VEHICLE_CONFIGS[vehicleKey];
+      const config = getActiveVehicleConfig();
       if (config) {
         const chConfig = config.channels && config.channels.find(c => c.id === chId);
         if (chConfig && chConfig.physicalLight && config.defaultStates) {
-          const defaultBri = (config.defaultStates[chConfig.physicalLight] || {}).brightness || 0;
-          if (leftData.points.length > 0) leftData.points[0].b = defaultBri;
-          if (rightData.points.length > 0) rightData.points[0].b = defaultBri;
+          const defaultBrightness = (config.defaultStates[chConfig.physicalLight] || {}).brightness || 0;
+          if (leftData.points.length > 0) leftData.points[0].b = defaultBrightness;
+          if (rightData.points.length > 0) rightData.points[0].b = defaultBrightness;
         }
       }
     }
@@ -115,8 +102,7 @@ function getDefaultBrightnessLines(seqIndex) {
   if (!seq || seq.identifier === RAW_IDENTIFIER) return lines;
 
   const chId = parseInt(seq.identifier, 16);
-  const vehicleKey = document.getElementById("vehicleSelect").value;
-  const config = VEHICLE_CONFIGS[vehicleKey];
+  const config = getActiveVehicleConfig();
   if (!config) return lines;
 
   // Direct default brightness for this channel
@@ -127,9 +113,9 @@ function getDefaultBrightnessLines(seqIndex) {
   // PhysicalLight default brightness
   const chConfig = config.channels && config.channels.find(c => c.id === chId);
   if (chConfig && chConfig.physicalLight && config.defaultStates) {
-    const defaultBri = (config.defaultStates[chConfig.physicalLight] || {}).brightness || 0;
-    if (defaultBri > 0 && !lines.includes(defaultBri)) {
-      lines.push(defaultBri);
+    const defaultBrightness = (config.defaultStates[chConfig.physicalLight] || {}).brightness || 0;
+    if (defaultBrightness > 0 && !lines.includes(defaultBrightness)) {
+      lines.push(defaultBrightness);
     }
   }
 
@@ -245,12 +231,15 @@ function createSequenceChart(seqIndex, containerDiv) {
     if (!containerDiv.contains(wrapper)) {
       resizeObserver.disconnect();
       mutObserver.disconnect();
+      if (state._seekCleanup) state._seekCleanup();
+      if (state._editCleanup) state._editCleanup();
     }
   });
   mutObserver.observe(containerDiv, { childList: true });
 
   // Click-to-seek (only when not in edit mode)
   let isSeekDragging = false;
+  const seekMouseUp = () => { isSeekDragging = false; };
   svg.addEventListener('mousedown', (e) => {
     if (state.editMode) return;
     isSeekDragging = true;
@@ -259,7 +248,11 @@ function createSequenceChart(seqIndex, containerDiv) {
   svg.addEventListener('mousemove', (e) => {
     if (isSeekDragging && !state.editMode) handleChartSeek(e, state);
   });
-  document.addEventListener('mouseup', () => { isSeekDragging = false; });
+  document.addEventListener('mouseup', seekMouseUp);
+
+  state._seekCleanup = () => {
+    document.removeEventListener('mouseup', seekMouseUp);
+  };
 
   return state;
 }
@@ -321,8 +314,8 @@ function renderSequenceChartContent(state, svgWidth) {
   }
 
   // Fill polygons (translucent)
-  drawChartFill(state.fillGroup, leftData.points, maxTime, plotWidth, plotHeight, '#0000ff');
-  drawChartFill(state.fillGroup, rightData.points, maxTime, plotWidth, plotHeight, '#ff0000');
+  drawChartFill(state.fillGroup, leftData.points, maxTime, plotWidth, plotHeight, SIDE_COLOR_LEFT);
+  drawChartFill(state.fillGroup, rightData.points, maxTime, plotWidth, plotHeight, SIDE_COLOR_RIGHT);
 
   // Overlay curves with segment-level L/R color coding
   drawOverlayCurves(state.curveGroup, leftData.points, rightData.points, maxTime, plotWidth, plotHeight);
@@ -346,66 +339,41 @@ function renderSequenceChartContent(state, svgWidth) {
 }
 
 function drawChartFill(group, points, maxTime, plotWidth, plotHeight, color) {
-  if (points.length < 2) return;
-
-  const polyPoints = [];
-  for (const p of points) {
-    polyPoints.push(`${timeToX(p.t, maxTime, plotWidth)},${brightnessToY(p.b, plotHeight)}`);
-  }
-  polyPoints.push(`${timeToX(points[points.length - 1].t, maxTime, plotWidth)},${TL_MARGIN + plotHeight}`);
-  polyPoints.push(`${timeToX(points[0].t, maxTime, plotWidth)},${TL_MARGIN + plotHeight}`);
-
-  const polygon = document.createElementNS(SVG_NS, 'polygon');
-  polygon.setAttribute('points', polyPoints.join(' '));
-  polygon.setAttribute('fill', color);
-  polygon.setAttribute('fill-opacity', '0.07');
-  polygon.setAttribute('stroke', 'none');
-  polygon.classList.add('chart-fill-area');
-  group.appendChild(polygon);
+  const polygon = drawFillPolygon(group, points, maxTime, plotWidth, plotHeight, color, '0.07');
+  if (polygon) polygon.classList.add('chart-fill-area');
 }
 
-function drawOverlayCurves(group, leftPts, rightPts, maxTime, plotWidth, plotHeight) {
-  const identical = arePointsIdentical(leftPts, rightPts);
+function drawOverlayCurves(group, leftPoints, rightPoints, maxTime, plotWidth, plotHeight) {
+  const identical = arePointsIdentical(leftPoints, rightPoints);
 
   if (identical) {
     // Draw single green polyline
-    drawChartPolyline(group, leftPts, maxTime, plotWidth, plotHeight, '#00b400', 2);
+    drawChartPolyline(group, leftPoints, maxTime, plotWidth, plotHeight, COLOR_IDENTICAL, 2);
     return;
   }
 
   // Per-segment comparison: green where both match, blue for left, red for right
-  const maxPts = Math.max(leftPts.length, rightPts.length);
+  const maxPts = Math.max(leftPoints.length, rightPoints.length);
 
   for (let s = 0; s < maxPts - 1; s++) {
-    const lHas = s + 1 < leftPts.length;
-    const rHas = s + 1 < rightPts.length;
-    const bothMatch = lHas && rHas &&
-      leftPts[s].t === rightPts[s].t && leftPts[s].b === rightPts[s].b &&
-      leftPts[s + 1].t === rightPts[s + 1].t && leftPts[s + 1].b === rightPts[s + 1].b;
+    const leftHasSegment = s + 1 < leftPoints.length;
+    const rightHasSegment = s + 1 < rightPoints.length;
+    const bothMatch = leftHasSegment && rightHasSegment &&
+      leftPoints[s].t === rightPoints[s].t && leftPoints[s].b === rightPoints[s].b &&
+      leftPoints[s + 1].t === rightPoints[s + 1].t && leftPoints[s + 1].b === rightPoints[s + 1].b;
 
     if (bothMatch) {
-      drawChartSegment(group, leftPts[s], leftPts[s + 1], maxTime, plotWidth, plotHeight, '#00b400', 2);
+      drawChartSegment(group, leftPoints[s], leftPoints[s + 1], maxTime, plotWidth, plotHeight, COLOR_IDENTICAL, 2);
     } else {
-      if (lHas) drawChartSegment(group, leftPts[s], leftPts[s + 1], maxTime, plotWidth, plotHeight, '#0000ff', 2);
-      if (rHas) drawChartSegment(group, rightPts[s], rightPts[s + 1], maxTime, plotWidth, plotHeight, '#ff0000', 2);
+      if (leftHasSegment) drawChartSegment(group, leftPoints[s], leftPoints[s + 1], maxTime, plotWidth, plotHeight, SIDE_COLOR_LEFT, 2);
+      if (rightHasSegment) drawChartSegment(group, rightPoints[s], rightPoints[s + 1], maxTime, plotWidth, plotHeight, SIDE_COLOR_RIGHT, 2);
     }
   }
 }
 
 function drawChartPolyline(group, points, maxTime, plotWidth, plotHeight, color, strokeWidth) {
-  if (points.length < 2) return;
-  const linePoints = points.map(p =>
-    `${timeToX(p.t, maxTime, plotWidth)},${brightnessToY(p.b, plotHeight)}`
-  ).join(' ');
-
-  const polyline = document.createElementNS(SVG_NS, 'polyline');
-  polyline.setAttribute('points', linePoints);
-  polyline.setAttribute('fill', 'none');
-  polyline.setAttribute('stroke', color);
-  polyline.setAttribute('stroke-width', strokeWidth);
-  polyline.setAttribute('stroke-linejoin', 'round');
-  polyline.classList.add('chart-curve');
-  group.appendChild(polyline);
+  const polyline = drawCurvePolyline(group, points, maxTime, plotWidth, plotHeight, color, strokeWidth);
+  if (polyline) polyline.classList.add('chart-curve');
 }
 
 function drawChartSegment(group, p1, p2, maxTime, plotWidth, plotHeight, color, strokeWidth) {
@@ -445,68 +413,43 @@ function drawSVGDefaultBrightnessLine(group, plotWidth, plotHeight, brightness) 
   line.classList.add('chart-ref-line');
 }
 
-function drawChartHandles(group, leftPts, rightPts, maxTime, plotWidth, plotHeight, seqIndex, editSide) {
+function drawChartHandles(group, leftPoints, rightPoints, maxTime, plotWidth, plotHeight, seqIndex, editSide) {
   const showLeft = editSide === 'left' || editSide === 'both';
   const showRight = editSide === 'right' || editSide === 'both';
 
   if (editSide === 'both') {
     // When editing both: merge identical points into combined handles
-    const maxLen = Math.max(leftPts.length, rightPts.length);
+    const maxLen = Math.max(leftPoints.length, rightPoints.length);
     for (let i = 0; i < maxLen; i++) {
-      const lPt = i < leftPts.length ? leftPts[i] : null;
-      const rPt = i < rightPts.length ? rightPts[i] : null;
-      const bothExist = lPt && rPt;
-      const identical = bothExist && lPt.t === rPt.t && lPt.b === rPt.b;
+      const leftPoint = i < leftPoints.length ? leftPoints[i] : null;
+      const rightPoint = i < rightPoints.length ? rightPoints[i] : null;
+      const bothExist = leftPoint && rightPoint;
+      const identical = bothExist && leftPoint.t === rightPoint.t && leftPoint.b === rightPoint.b;
 
       if (identical) {
         // Combined handle — green, moves both sides
-        drawSingleHandle(group, lPt, i, 'both', seqIndex, maxTime, plotWidth, plotHeight, '#00b400');
+        drawSingleHandle(group, leftPoint, i, 'both', seqIndex, maxTime, plotWidth, plotHeight, COLOR_IDENTICAL);
       } else {
-        if (lPt) drawSingleHandle(group, lPt, i, 'left', seqIndex, maxTime, plotWidth, plotHeight, '#0000ff');
-        if (rPt) drawSingleHandle(group, rPt, i, 'right', seqIndex, maxTime, plotWidth, plotHeight, '#ff0000');
+        if (leftPoint) drawSingleHandle(group, leftPoint, i, 'left', seqIndex, maxTime, plotWidth, plotHeight, SIDE_COLOR_LEFT);
+        if (rightPoint) drawSingleHandle(group, rightPoint, i, 'right', seqIndex, maxTime, plotWidth, plotHeight, SIDE_COLOR_RIGHT);
       }
     }
   } else {
     if (showLeft) {
-      for (let i = 0; i < leftPts.length; i++) {
-        drawSingleHandle(group, leftPts[i], i, 'left', seqIndex, maxTime, plotWidth, plotHeight, '#0000ff');
+      for (let i = 0; i < leftPoints.length; i++) {
+        drawSingleHandle(group, leftPoints[i], i, 'left', seqIndex, maxTime, plotWidth, plotHeight, SIDE_COLOR_LEFT);
       }
     }
     if (showRight) {
-      for (let i = 0; i < rightPts.length; i++) {
-        drawSingleHandle(group, rightPts[i], i, 'right', seqIndex, maxTime, plotWidth, plotHeight, '#ff0000');
+      for (let i = 0; i < rightPoints.length; i++) {
+        drawSingleHandle(group, rightPoints[i], i, 'right', seqIndex, maxTime, plotWidth, plotHeight, SIDE_COLOR_RIGHT);
       }
     }
   }
 }
 
-function drawSingleHandle(group, point, index, side, seqIndex, maxTime, plotWidth, plotHeight, color) {
-  const cx = timeToX(point.t, maxTime, plotWidth);
-  const cy = brightnessToY(point.b, plotHeight);
-
-  const circle = document.createElementNS(SVG_NS, 'circle');
-  circle.setAttribute('cx', cx);
-  circle.setAttribute('cy', cy);
-  circle.setAttribute('data-point-index', index);
-  circle.setAttribute('data-side', side);
-  circle.setAttribute('data-seq-index', seqIndex);
-
-  if (index === 0) {
-    circle.setAttribute('r', '4');
-    circle.setAttribute('fill', '#999');
-    circle.setAttribute('stroke', '#fff');
-    circle.setAttribute('stroke-width', '1');
-    circle.classList.add('tl-origin');
-  } else {
-    circle.setAttribute('r', TL_HANDLE_RADIUS);
-    circle.setAttribute('fill', color);
-    circle.setAttribute('stroke', '#fff');
-    circle.setAttribute('stroke-width', '2');
-    circle.classList.add('tl-handle');
-  }
-
-  group.appendChild(circle);
-}
+// Alias for the shared drawHandle function
+const drawSingleHandle = drawHandle;
 
 // ============================================================================
 // Focused Step Highlight (direct DOM update, no polling)
@@ -517,10 +460,10 @@ function showFocusedStepOnChart(seqIndex, side, stepIndex) {
   if (!chart) return;
 
   const { leftData, rightData, maxTime } = getChartData(seqIndex);
-  const pts = side === 'left' ? leftData.points : rightData.points;
+  const points = side === 'left' ? leftData.points : rightData.points;
   const pointIdx = stepIndex + 1; // points[0] is initial {t:0, b:0}
 
-  if (pointIdx < 1 || pointIdx >= pts.length) return;
+  if (pointIdx < 1 || pointIdx >= points.length) return;
 
   const group = chart.focusedStepGroup;
   group.innerHTML = '';
@@ -528,23 +471,23 @@ function showFocusedStepOnChart(seqIndex, side, stepIndex) {
   const plotWidth = chart.plotWidth;
   const plotHeight = chart.plotHeight;
 
-  const pStart = pts[pointIdx - 1];
-  const pEnd = pts[pointIdx];
+  const pStart = points[pointIdx - 1];
+  const pEnd = points[pointIdx];
 
   const x1 = timeToX(pStart.t, maxTime, plotWidth);
   const y1 = brightnessToY(pStart.b, plotHeight);
   const x2 = timeToX(pEnd.t, maxTime, plotWidth);
   const y2 = brightnessToY(pEnd.b, plotHeight);
 
-  const sideColor = side === 'left' ? '#0000ff' : '#ff0000';
+  const sideColor = getSideColor(side);
 
   // Thick highlighted segment
   appendSVGLine(group, x1, y1, x2, y2, sideColor, 4);
 
   // Crosshair dashed lines from end point to axes
-  const hLine = appendSVGLine(group, x2, TL_MARGIN + plotHeight, x2, y2, 'rgba(100,100,100,0.47)', 1);
+  const hLine = appendSVGLine(group, x2, TL_MARGIN + plotHeight, x2, y2, '#64646478', 1);
   hLine.setAttribute('stroke-dasharray', '3,3');
-  const vLine = appendSVGLine(group, TL_MARGIN, y2, x2, y2, 'rgba(100,100,100,0.47)', 1);
+  const vLine = appendSVGLine(group, TL_MARGIN, y2, x2, y2, '#64646478', 1);
   vLine.setAttribute('stroke-dasharray', '3,3');
 
   // Dot at end point
@@ -671,6 +614,7 @@ function createSummaryChart(physicalChId, containerDiv, config) {
     if (!containerDiv.contains(svg)) {
       resizeObserver.disconnect();
       mutObserver.disconnect();
+      if (state._seekCleanup) state._seekCleanup();
     }
   });
   mutObserver.observe(containerDiv, { childList: true });
@@ -691,9 +635,14 @@ function createSummaryChart(physicalChId, containerDiv, config) {
       document.removeEventListener('mouseup', clear);
     }, { once: true });
   };
+  const summarySeekMouseUp = () => { isDragging = false; };
   svg.addEventListener('mousedown', (e) => { isDragging = true; seekHandler(e); });
   svg.addEventListener('mousemove', (e) => { if (isDragging) seekHandler(e); });
-  document.addEventListener('mouseup', () => { isDragging = false; });
+  document.addEventListener('mouseup', summarySeekMouseUp);
+
+  state._seekCleanup = () => {
+    document.removeEventListener('mouseup', summarySeekMouseUp);
+  };
 
   return state;
 }
@@ -746,7 +695,7 @@ function renderSummaryChartContent(state, svgWidth) {
       let cumTime = phase.start;
       for (let di = 0; di < seq.data.length; di += 2) {
         const durHex = parseInt(seq.data[di], 16) || 0;
-        cumTime += durHex * 20;
+        cumTime += durHex * TIME_MULTIPLIER;
         if (cumTime <= maxTime) sampleTimes.add(cumTime);
       }
     }
@@ -772,11 +721,11 @@ function renderSummaryChartContent(state, svgWidth) {
   // Default brightness reference line
   const defaults = config.defaultStates || {};
   if (defaults[physicalChId]) {
-    const defaultBri = defaults[physicalChId].brightness;
-    if (defaultBri > 0) {
-      drawSVGDefaultBrightnessLine(state.refLineGroup, plotWidth, plotHeight, defaultBri);
-      const labelY = brightnessToY(defaultBri, plotHeight);
-      appendSVGText(state.refLineGroup, TL_MARGIN + 3, labelY - 3, `Default: ${defaultBri}%`, 'start', '9px', '#999');
+    const defaultBrightness = defaults[physicalChId].brightness;
+    if (defaultBrightness > 0) {
+      drawSVGDefaultBrightnessLine(state.refLineGroup, plotWidth, plotHeight, defaultBrightness);
+      const labelY = brightnessToY(defaultBrightness, plotHeight);
+      appendSVGText(state.refLineGroup, TL_MARGIN + 3, labelY - 3, `Default: ${defaultBrightness}%`, 'start', '9px', '#999');
     }
   }
 
@@ -808,22 +757,22 @@ function drawSummaryCurves(group, leftPoints, rightPoints, maxTime, plotWidth, p
   const segCount = leftPoints.length - 1;
   if (segCount <= 0) return;
 
-  const briMatch = (i) => Math.abs(leftPoints[i].b - rightPoints[i].b) < 0.01;
+  const brightnessMatches = (i) => Math.abs(leftPoints[i].b - rightPoints[i].b) < 0.01;
 
   // Classify segments
-  const segClass = [];
+  const segmentClassifications = [];
   for (let i = 0; i < segCount; i++) {
     const isDef = isDefaultSource(leftPoints[i].src) || isDefaultSource(rightPoints[i].src);
-    const isMatch = briMatch(i) && briMatch(i + 1);
-    segClass.push({ isDef, isMatch });
+    const isMatch = brightnessMatches(i) && brightnessMatches(i + 1);
+    segmentClassifications.push({ isDef, isMatch });
   }
 
   // Group consecutive segments with same classification into polyline runs
-  const drawRun = (pts, startSeg, endSeg, color, isDef) => {
+  const drawRun = (sidePoints, startSeg, endSeg, color, isDef) => {
     if (startSeg > endSeg) return;
     const runPoints = [];
-    for (let i = startSeg; i <= endSeg + 1 && i < pts.length; i++) {
-      runPoints.push(pts[i]);
+    for (let i = startSeg; i <= endSeg + 1 && i < sidePoints.length; i++) {
+      runPoints.push(sidePoints[i]);
     }
     if (runPoints.length < 2) return;
 
@@ -844,19 +793,19 @@ function drawSummaryCurves(group, leftPoints, rightPoints, maxTime, plotWidth, p
 
   let runStart = 0;
   while (runStart < segCount) {
-    const { isDef, isMatch } = segClass[runStart];
+    const { isDef, isMatch } = segmentClassifications[runStart];
     let runEnd = runStart;
     while (runEnd + 1 < segCount &&
-           segClass[runEnd + 1].isDef === isDef &&
-           segClass[runEnd + 1].isMatch === isMatch) {
+           segmentClassifications[runEnd + 1].isDef === isDef &&
+           segmentClassifications[runEnd + 1].isMatch === isMatch) {
       runEnd++;
     }
 
     if (isMatch) {
-      drawRun(leftPoints, runStart, runEnd, '#00b400', isDef);
+      drawRun(leftPoints, runStart, runEnd, COLOR_IDENTICAL, isDef);
     } else {
-      drawRun(leftPoints, runStart, runEnd, '#0000ff', isDef);
-      drawRun(rightPoints, runStart, runEnd, '#ff0000', isDef);
+      drawRun(leftPoints, runStart, runEnd, SIDE_COLOR_LEFT, isDef);
+      drawRun(rightPoints, runStart, runEnd, SIDE_COLOR_RIGHT, isDef);
     }
 
     runStart = runEnd + 1;
@@ -943,16 +892,16 @@ function drawSummaryLegend(group, plotWidth, plotHeight) {
   bg.setAttribute('width', 110);
   bg.setAttribute('height', 18);
   bg.setAttribute('rx', 3);
-  bg.setAttribute('fill', 'rgba(255,255,255,0.85)');
+  bg.setAttribute('fill', '#ffffffd9');
   bg.setAttribute('stroke', 'none');
   group.appendChild(bg);
 
   // Solid line + "Channel" label
-  appendSVGLine(group, lx, ly + 7, lx + 16, ly + 7, '#00b400', 2);
+  appendSVGLine(group, lx, ly + 7, lx + 16, ly + 7, COLOR_IDENTICAL, 2);
   appendSVGText(group, lx + 19, ly + 10, 'Channel', 'start', '8px', '#555');
 
   // Dashed line + "Default" label
-  const dashLine = appendSVGLine(group, lx + 58, ly + 7, lx + 74, ly + 7, '#00b400', 2);
+  const dashLine = appendSVGLine(group, lx + 58, ly + 7, lx + 74, ly + 7, COLOR_IDENTICAL, 2);
   dashLine.setAttribute('stroke-dasharray', '6,4');
   appendSVGText(group, lx + 77, ly + 10, 'Default', 'start', '8px', '#555');
 }
@@ -1028,13 +977,13 @@ function wireChartEditInteractions(chart) {
     seq.data[stepIndex * 2 + 1] = Math.round(rawBri).toString(16).toUpperCase().padStart(2, '0');
 
     const prevTime = rawPoints[pointIndex - 1].t;
-    const newDuration = Math.max(0, Math.round((rawTime - prevTime) / 20));
+    const newDuration = Math.max(0, Math.min(255, Math.round((rawTime - prevTime) / TIME_MULTIPLIER)));
     seq.data[stepIndex * 2] = newDuration.toString(16).toUpperCase().padStart(2, '0');
 
     const nextStepIndex = stepIndex + 1;
     if (nextStepIndex < Math.floor(seq.data.length / 2) && pointIndex + 1 < rawPoints.length) {
       const nextPointTime = rawPoints[pointIndex + 1].t;
-      const nextDuration = Math.max(0, Math.round((nextPointTime - rawTime) / 20));
+      const nextDuration = Math.max(0, Math.min(255, Math.round((nextPointTime - rawTime) / TIME_MULTIPLIER)));
       seq.data[nextStepIndex * 2] = nextDuration.toString(16).toUpperCase().padStart(2, '0');
     }
 
@@ -1048,7 +997,7 @@ function wireChartEditInteractions(chart) {
     if (handle) {
       e.preventDefault();
       e.stopPropagation();
-      const pointIndex = parseInt(handle.dataset.pointIndex);
+      const pointIndex = parseInt(handle.dataset.pointIndex, 10);
       const handleSide = handle.dataset.side; // 'left', 'right', or 'both'
 
       // For combined handles, use left seq for inspector but track both
@@ -1096,20 +1045,20 @@ function wireChartEditInteractions(chart) {
       for (const side of getEditableSides()) {
         const seq = sideData[side].sequences[seqIndex];
         if (!seq || seq.identifier === RAW_IDENTIFIER) continue;
-        const pts = parseForChart(seq).points;
+        const sidePoints = parseForChart(seq).points;
         const phaseOffset = getChannelPhaseOffset(seqIndex);
         if (phaseOffset > 0) {
-          for (const p of pts) p.t += phaseOffset;
+          for (const point of sidePoints) point.t += phaseOffset;
         }
-        applyDefaultBrightnessToPoints(pts, seqIndex);
+        applyDefaultBrightnessToPoints(sidePoints, seqIndex);
 
-        const result = findInsertSegment(pts, clickTime, chart.maxTime, chart.plotWidth, chart.plotHeight, localX, localY);
+        const result = findInsertSegment(sidePoints, clickTime, chart.maxTime, chart.plotWidth, chart.plotHeight, localX, localY);
         if (result) {
           const i = result.segmentIndex;
-          const x1 = timeToX(pts[i].t, chart.maxTime, chart.plotWidth);
-          const y1 = brightnessToY(pts[i].b, chart.plotHeight);
-          const x2 = timeToX(pts[i + 1].t, chart.maxTime, chart.plotWidth);
-          const y2 = brightnessToY(pts[i + 1].b, chart.plotHeight);
+          const x1 = timeToX(sidePoints[i].t, chart.maxTime, chart.plotWidth);
+          const y1 = brightnessToY(sidePoints[i].b, chart.plotHeight);
+          const x2 = timeToX(sidePoints[i + 1].t, chart.maxTime, chart.plotWidth);
+          const y2 = brightnessToY(sidePoints[i + 1].b, chart.plotHeight);
           const dist = pointToSegmentDistance(localX, localY, x1, y1, x2, y2);
           if (dist < bestDist) {
             bestDist = dist;
@@ -1148,13 +1097,13 @@ function wireChartEditInteractions(chart) {
     let rawBri = yToBrightness(localY, chart.plotHeight);
 
     rawTime -= phaseOffset;
-    rawTime = Math.round(rawTime / 20) * 20;
+    rawTime = Math.round(rawTime / TIME_MULTIPLIER) * TIME_MULTIPLIER;
     rawBri = Math.round(Math.max(0, Math.min(100, rawBri)));
 
     // Clamp within neighbor bounds (use primary side for constraints)
     const rawPoints = parseForChart(seq).points;
-    const minTime = (pointIndex > 1) ? rawPoints[pointIndex - 1].t + 20 : 20;
-    const maxPointTime = (pointIndex < rawPoints.length - 1) ? rawPoints[pointIndex + 1].t - 20 : maxTime;
+    const minTime = (pointIndex > 1) ? rawPoints[pointIndex - 1].t + TIME_MULTIPLIER : TIME_MULTIPLIER;
+    const maxPointTime = (pointIndex < rawPoints.length - 1) ? rawPoints[pointIndex + 1].t - TIME_MULTIPLIER : maxTime;
     rawTime = Math.max(minTime, Math.min(maxPointTime, rawTime));
 
     // Live update handle position
@@ -1167,7 +1116,7 @@ function wireChartEditInteractions(chart) {
     chartDragState.rawTime = rawTime;
     chartDragState.rawBri = rawBri;
 
-    updateInspectorLive(inspector, rawPoints, pointIndex, rawTime + phaseOffset, rawBri);
+    updateInspectorLive(inspector, rawPoints, pointIndex, rawTime, rawBri);
   };
 
   const onMouseUp = () => {
@@ -1233,17 +1182,27 @@ function applyDefaultBrightnessToPoints(points, seqIndex) {
   if (!seq || seq.identifier === RAW_IDENTIFIER) return;
 
   const chId = parseInt(seq.identifier, 16);
-  const vehicleKey = document.getElementById("vehicleSelect").value;
-  const config = VEHICLE_CONFIGS[vehicleKey];
+  const config = getActiveVehicleConfig();
   if (!config) return;
 
   const chConfig = config.channels && config.channels.find(c => c.id === chId);
   if (chConfig && chConfig.physicalLight && config.defaultStates) {
-    const defaultBri = (config.defaultStates[chConfig.physicalLight] || {}).brightness || 0;
-    if (points.length > 0) points[0].b = defaultBri;
+    const defaultBrightness = (config.defaultStates[chConfig.physicalLight] || {}).brightness || 0;
+    if (points.length > 0) points[0].b = defaultBrightness;
   }
 }
 
 function cleanupSummaryCharts() {
+  for (const chart of summaryChartInstances) {
+    if (chart._seekCleanup) chart._seekCleanup();
+  }
   summaryChartInstances = [];
+}
+
+function cleanupSequenceCharts() {
+  for (const chart of chartInstances) {
+    if (chart._seekCleanup) chart._seekCleanup();
+    if (chart._editCleanup) chart._editCleanup();
+  }
+  chartInstances = [];
 }

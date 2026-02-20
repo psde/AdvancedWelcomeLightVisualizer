@@ -410,4 +410,48 @@ describe('Edge cases', () => {
     ensureMaxSize(arr, 5);
     assert.strictEqual(arr.length, 2);
   });
+
+  it('parseByteString / buildByteString round-trip', () => {
+    const original = ['0A', '64', '14', '32', 'FF', '00'];
+    const str = buildByteString(original);
+    const parsed = parseByteString(str);
+    assert.deepStrictEqual(parsed, original);
+  });
+});
+
+// ============================================================================
+// Template byte count constraints (F6)
+// ============================================================================
+describe('Template byte count constraints', () => {
+  for (const [name, tmpl] of Object.entries(TEMPLATES)) {
+    it(`${name}: left staging bytes within limits`, () => {
+      const left1 = parseByteString(tmpl.left1);
+      const left2 = parseByteString(tmpl.left2);
+      assert.ok(left1.length <= MAX_STAGING1,
+        `left1 has ${left1.length} bytes, max is ${MAX_STAGING1}`);
+      assert.ok(left2.length <= MAX_STAGING2,
+        `left2 has ${left2.length} bytes, max is ${MAX_STAGING2}`);
+    });
+
+    it(`${name}: right staging bytes within limits`, () => {
+      const right1 = parseByteString(tmpl.right1);
+      const right2 = parseByteString(tmpl.right2);
+      assert.ok(right1.length <= MAX_STAGING1,
+        `right1 has ${right1.length} bytes, max is ${MAX_STAGING1}`);
+      assert.ok(right2.length <= MAX_STAGING2,
+        `right2 has ${right2.length} bytes, max is ${MAX_STAGING2}`);
+    });
+
+    it(`${name}: no RAW sequences from valid template data`, () => {
+      for (const side of ['left', 'right']) {
+        const s1 = parseByteString(tmpl[side + '1']);
+        const s2 = parseByteString(tmpl[side + '2']);
+        const seqs = parseAllSequencesFromBytes(s1, s2);
+        for (const seq of seqs) {
+          assert.notStrictEqual(seq.identifier, RAW_IDENTIFIER,
+            `${name} ${side} produced RAW sequence — possible data corruption`);
+        }
+      }
+    });
+  }
 });

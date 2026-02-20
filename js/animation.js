@@ -12,8 +12,7 @@ function rebuildAnimationPlayer() {
   leftContainer.innerHTML = "";
   rightContainer.innerHTML = "";
 
-  const vehicleKey = document.getElementById("vehicleSelect").value;
-  const config = VEHICLE_CONFIGS[vehicleKey] || VEHICLE_CONFIGS["generic"];
+  const config = getActiveVehicleConfig() || VEHICLE_CONFIGS["generic"];
 
   if (config.type === "image") {
     setupImageVisualization(leftContainer, rightContainer, config);
@@ -229,11 +228,22 @@ function updateControls(time) {
 }
 
 function getLightElement(side, seq, idx) {
-  if (seq && seq.identifier !== "RAW") {
+  if (seq && seq.identifier !== RAW_IDENTIFIER) {
     const el = document.getElementById(`${side}_light_ch${parseInt(seq.identifier, 16)}`);
     if (el) return el;
   }
   return document.getElementById(`${side}_light_${idx}`);
+}
+
+function getPhysicalLightIds(config) {
+  if (!config || !config.channels) return [];
+  const ids = [];
+  for (const ch of config.channels) {
+    if (!ch.physicalLight && (ch.shapes || ch.type)) {
+      ids.push(ch.id);
+    }
+  }
+  return ids;
 }
 
 function findSequenceByChannelId(side, channelId) {
@@ -263,8 +273,8 @@ function resolvePhysicalLightPhase(physicalChId, time, side, config) {
   const defaults = config.defaultStates || {};
   const controllingChannels = getControllingChannelsSorted(physicalChId, config, timeline);
 
-  for (let ci = 0; ci < controllingChannels.length; ci++) {
-    const chId = controllingChannels[ci];
+  for (let channelIndex = 0; channelIndex < controllingChannels.length; channelIndex++) {
+    const chId = controllingChannels[channelIndex];
     const phaseIdx = timeline.channelPhaseMap[chId];
     if (phaseIdx === undefined) continue;
 
@@ -278,13 +288,13 @@ function resolvePhysicalLightPhase(physicalChId, time, side, config) {
     if (time >= phase.start && time < effectiveEnd) {
       const localTime = time - phase.start;
       if (phase.maxDuration !== null && localTime >= phase.maxDuration) return { state: 'capped' };
-      return { state: 'active', ci, phase, seq, localTime };
+      return { state: 'active', channelIndex, phase, seq, localTime };
     }
 
     // Check for gap between phases
-    const nextCi = ci + 1;
-    if (nextCi < controllingChannels.length) {
-      const nextChId = controllingChannels[nextCi];
+    const nextChannelIndex = channelIndex + 1;
+    if (nextChannelIndex < controllingChannels.length) {
+      const nextChId = controllingChannels[nextChannelIndex];
       const nextPhaseIdx = timeline.channelPhaseMap[nextChId];
       if (nextPhaseIdx !== undefined) {
         const nextPhase = timeline.phases[nextPhaseIdx];
@@ -322,7 +332,7 @@ function getPhysicalLightBrightness(physicalChId, time, side, config) {
     case 'active': {
       // Phase 2+ starts from default brightness; Phase 1 starts from 0
       let initBri = 0;
-      if (result.ci > 0) {
+      if (result.channelIndex > 0) {
         const defaultState = defaults[physicalChId];
         initBri = defaultState ? (defaultState.brightness || 0) : 0;
       }
@@ -364,8 +374,7 @@ function updateVisuals(time) {
 
   // Phase-aware rendering path
   if (currentPhaseTimeline) {
-    const vehicleKey = document.getElementById("vehicleSelect").value;
-    const config = VEHICLE_CONFIGS[vehicleKey] || VEHICLE_CONFIGS["generic"];
+    const config = getActiveVehicleConfig() || VEHICLE_CONFIGS["generic"];
 
     if (config.channels) {
       for (const side of ['left', 'right']) {
@@ -469,7 +478,7 @@ function applyBrightness(element, brightness) {
   }
 }
 
-function getBrightnessAtTime(seq, timeObj, initialBrightness) {
+function getBrightnessAtTime(seq, time, initialBrightness) {
   if (!seq || seq.identifier === RAW_IDENTIFIER) return 0;
 
   let tStart = 0;
@@ -478,14 +487,13 @@ function getBrightnessAtTime(seq, timeObj, initialBrightness) {
   for (let i = 0; i < seq.data.length; i += 2) {
     const durHex = parseInt(seq.data[i], 16) || 0;
     const briHex = parseInt(seq.data[i + 1], 16) || 0;
-    // Real-world validation: 60fps recordings confirmed ×20 multiplier (BMW G20 2020)
-    const stepDur = durHex * 20;
+    const stepDur = durHex * TIME_MULTIPLIER;
     const bEnd = Math.min(briHex, 100);
     const tEnd = tStart + stepDur;
 
-    if (timeObj >= tStart && timeObj <= tEnd) {
+    if (time >= tStart && time <= tEnd) {
       if (stepDur === 0) return bEnd;
-      const progress = (timeObj - tStart) / stepDur;
+      const progress = (time - tStart) / stepDur;
       return bStart + (bEnd - bStart) * progress;
     }
 

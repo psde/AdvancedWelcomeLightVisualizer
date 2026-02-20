@@ -1,32 +1,5 @@
-const SVG_NS = 'http://www.w3.org/2000/svg';
-const TL_MARGIN = 40;
-const TL_HEIGHT = 250;
-const TL_HANDLE_RADIUS = 6;
-const TL_COLORS = { left: '#0000ff', right: '#ff0000' };
-
 let tlDragState = null;
 let tlSelectedKeypoint = null;
-
-function getSideColor(side) {
-  return TL_COLORS[side] || TL_COLORS.left;
-}
-
-// Coordinate mapping — shared between timeline editors and charts
-function timeToX(time, maxTime, plotWidth) {
-  return TL_MARGIN + (time / maxTime) * plotWidth;
-}
-
-function brightnessToY(brightness, plotHeight) {
-  return TL_MARGIN + (1 - brightness / 100) * plotHeight;
-}
-
-function xToTime(x, maxTime, plotWidth) {
-  return ((x - TL_MARGIN) / plotWidth) * maxTime;
-}
-
-function yToBrightness(y, plotHeight) {
-  return (1 - (y - TL_MARGIN) / plotHeight) * 100;
-}
 
 function getTimelineMaxTime(seq, side, seqIndex) {
   const chartData = parseForChart(seq);
@@ -122,13 +95,6 @@ function renderTimelineEditor(container, side, seqIndex, seq) {
   mutObserver.observe(container, { childList: true });
 }
 
-function createSVGGroup(svg, className) {
-  const g = document.createElementNS(SVG_NS, 'g');
-  g.setAttribute('class', className);
-  svg.appendChild(g);
-  return g;
-}
-
 function renderSVGContent(state, svgWidth, inspector) {
   const { svg, gridGroup, fillGroup, curveGroup, handlesGroup, points, maxTime, side, seqIndex, seq } = state;
   state.lastRenderedWidth = Math.round(svgWidth);
@@ -201,69 +167,16 @@ function drawTimelineGrid(group, plotWidth, plotHeight, maxTime) {
 }
 
 function drawTimelineFill(group, points, maxTime, plotWidth, plotHeight, color) {
-  if (points.length < 2) return;
-
-  const polyPoints = [];
-  for (const p of points) {
-    polyPoints.push(`${timeToX(p.t, maxTime, plotWidth)},${brightnessToY(p.b, plotHeight)}`);
-  }
-  // Close along bottom edge
-  polyPoints.push(`${timeToX(points[points.length - 1].t, maxTime, plotWidth)},${TL_MARGIN + plotHeight}`);
-  polyPoints.push(`${timeToX(points[0].t, maxTime, plotWidth)},${TL_MARGIN + plotHeight}`);
-
-  const polygon = document.createElementNS(SVG_NS, 'polygon');
-  polygon.setAttribute('points', polyPoints.join(' '));
-  polygon.setAttribute('fill', color);
-  polygon.setAttribute('fill-opacity', '0.1');
-  polygon.setAttribute('stroke', 'none');
-  group.appendChild(polygon);
+  drawFillPolygon(group, points, maxTime, plotWidth, plotHeight, color, '0.1');
 }
 
 function drawTimelineCurve(group, points, maxTime, plotWidth, plotHeight, color) {
-  if (points.length < 2) return;
-
-  const linePoints = points.map(p =>
-    `${timeToX(p.t, maxTime, plotWidth)},${brightnessToY(p.b, plotHeight)}`
-  ).join(' ');
-
-  const polyline = document.createElementNS(SVG_NS, 'polyline');
-  polyline.setAttribute('points', linePoints);
-  polyline.setAttribute('fill', 'none');
-  polyline.setAttribute('stroke', color);
-  polyline.setAttribute('stroke-width', '2');
-  polyline.setAttribute('stroke-linejoin', 'round');
-  group.appendChild(polyline);
+  drawCurvePolyline(group, points, maxTime, plotWidth, plotHeight, color, 2);
 }
 
 function drawTimelineHandles(group, points, maxTime, plotWidth, plotHeight, color, side, seqIndex) {
   for (let i = 0; i < points.length; i++) {
-    const p = points[i];
-    const cx = timeToX(p.t, maxTime, plotWidth);
-    const cy = brightnessToY(p.b, plotHeight);
-
-    const circle = document.createElementNS(SVG_NS, 'circle');
-    circle.setAttribute('cx', cx);
-    circle.setAttribute('cy', cy);
-    circle.setAttribute('data-point-index', i);
-    circle.setAttribute('data-side', side);
-    circle.setAttribute('data-seq-index', seqIndex);
-
-    if (i === 0) {
-      // Origin point — not draggable
-      circle.setAttribute('r', '4');
-      circle.setAttribute('fill', '#999');
-      circle.setAttribute('stroke', '#fff');
-      circle.setAttribute('stroke-width', '1');
-      circle.classList.add('tl-origin');
-    } else {
-      circle.setAttribute('r', TL_HANDLE_RADIUS);
-      circle.setAttribute('fill', color);
-      circle.setAttribute('stroke', '#fff');
-      circle.setAttribute('stroke-width', '2');
-      circle.classList.add('tl-handle');
-    }
-
-    group.appendChild(circle);
+    drawHandle(group, points[i], i, side, seqIndex, maxTime, plotWidth, plotHeight, color);
   }
 }
 
@@ -297,23 +210,17 @@ function restoreTimelineSelection(state, inspector) {
 function wireTimelineInteractions(svg, state, svgWidth, plotWidth, plotHeight, inspector) {
   const { points, maxTime, side, seqIndex, seq } = state;
 
-  // Remove old listeners by replacing with clone
-  const newSvg = svg.cloneNode(true);
-  svg.parentNode.replaceChild(newSvg, svg);
-  state.svg = newSvg;
-
-  // Re-grab group references after clone
-  state.gridGroup = newSvg.querySelector('.tl-grid');
-  state.fillGroup = newSvg.querySelector('.tl-fill');
-  state.curveGroup = newSvg.querySelector('.tl-curve');
-  state.handlesGroup = newSvg.querySelector('.tl-handles');
+  // Abort previous SVG-level listeners
+  if (state._interactionAbort) state._interactionAbort.abort();
+  const controller = new AbortController();
+  state._interactionAbort = controller;
 
   // Mouse/pointer events for drag
-  newSvg.addEventListener('mousedown', (e) => {
+  svg.addEventListener('mousedown', (e) => {
     const handle = e.target.closest('.tl-handle');
     if (handle) {
       e.preventDefault();
-      const pointIndex = parseInt(handle.dataset.pointIndex);
+      const pointIndex = parseInt(handle.dataset.pointIndex, 10);
       tlSelectedKeypoint = { side, seqIndex, pointIndex };
       updateSelectionVisual(state.handlesGroup);
       updateInspector(inspector, side, seqIndex, seq, points, pointIndex);
@@ -322,19 +229,19 @@ function wireTimelineInteractions(svg, state, svgWidth, plotWidth, plotHeight, i
         side,
         seqIndex,
         pointIndex,
-        svg: newSvg,
+        svg,
         state,
         plotWidth,
         plotHeight,
         svgWidth,
         inspector
       };
-      newSvg.classList.add('tl-dragging');
+      svg.classList.add('tl-dragging');
       return;
     }
 
     // Click on empty area — check for insert or deselect
-    const svgRect = newSvg.getBoundingClientRect();
+    const svgRect = svg.getBoundingClientRect();
     const localX = e.clientX - svgRect.left;
     const localY = e.clientY - svgRect.top;
 
@@ -355,17 +262,20 @@ function wireTimelineInteractions(svg, state, svgWidth, plotWidth, plotHeight, i
     tlSelectedKeypoint = null;
     updateSelectionVisual(state.handlesGroup);
     inspector.style.display = 'none';
-  });
+  }, { signal: controller.signal });
+
+  // Remove previous global listeners if they exist from a prior wiring
+  if (state._dragCleanup) state._dragCleanup();
 
   // Global move/up handlers for drag
   const onMouseMove = (e) => {
-    if (!tlDragState || tlDragState.svg !== newSvg) return;
+    if (!tlDragState || tlDragState.svg !== svg) return;
     e.preventDefault();
     handleTimelineDrag(e);
   };
 
   const onMouseUp = (e) => {
-    if (!tlDragState || tlDragState.svg !== newSvg) return;
+    if (!tlDragState || tlDragState.svg !== svg) return;
     e.preventDefault();
     commitTimelineDrag();
   };
@@ -373,21 +283,17 @@ function wireTimelineInteractions(svg, state, svgWidth, plotWidth, plotHeight, i
   document.addEventListener('mousemove', onMouseMove);
   document.addEventListener('mouseup', onMouseUp);
 
+  state._dragCleanup = () => {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    state._dragCleanup = null;
+  };
+
   // Keyboard handling
-  newSvg.addEventListener('keydown', (e) => {
+  svg.addEventListener('keydown', (e) => {
     if (!tlSelectedKeypoint || tlSelectedKeypoint.side !== side || tlSelectedKeypoint.seqIndex !== seqIndex) return;
     handleTimelineKeydown(e, side, seqIndex, seq, inspector);
-  });
-
-  // Clean up global listeners when SVG is removed
-  const cleanupObserver = new MutationObserver(() => {
-    if (!document.contains(newSvg)) {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      cleanupObserver.disconnect();
-    }
-  });
-  cleanupObserver.observe(document.body, { childList: true, subtree: true });
+  }, { signal: controller.signal });
 }
 
 function findInsertSegment(points, clickTime, maxTime, plotWidth, plotHeight, localX, localY) {
@@ -425,7 +331,7 @@ function pointToSegmentDistance(px, py, x1, y1, x2, y2) {
 
 function insertTimelinePoint(side, seqIndex, seq, segmentIndex, clickTime, clickBri) {
   // Snap to 20ms grid and 1% brightness
-  const snappedTime = Math.round(clickTime / 20) * 20;
+  const snappedTime = Math.round(clickTime / TIME_MULTIPLIER) * TIME_MULTIPLIER;
   const snappedBri = Math.round(Math.max(0, Math.min(100, clickBri)));
 
   // segmentIndex i: insert between point i and point i+1
@@ -438,10 +344,10 @@ function insertTimelinePoint(side, seqIndex, seq, segmentIndex, clickTime, click
   const nextTime = points[segmentIndex + 1].t;
 
   // Clamp new time between neighbors
-  const clampedTime = Math.max(prevTime + 20, Math.min(nextTime - 20, snappedTime));
+  const clampedTime = Math.max(prevTime + TIME_MULTIPLIER, Math.min(nextTime - TIME_MULTIPLIER, snappedTime));
 
-  const newDuration = Math.round((clampedTime - prevTime) / 20);
-  const remainingDuration = Math.round((nextTime - clampedTime) / 20);
+  const newDuration = Math.min(255, Math.round((clampedTime - prevTime) / TIME_MULTIPLIER));
+  const remainingDuration = Math.min(255, Math.round((nextTime - clampedTime) / TIME_MULTIPLIER));
 
   const newDurHex = newDuration.toString(16).toUpperCase().padStart(2, '0');
   const newBriHex = snappedBri.toString(16).toUpperCase().padStart(2, '0');
@@ -476,13 +382,13 @@ function handleTimelineDrag(e) {
   let rawBri = yToBrightness(localY, plotHeight);
 
   // Snap to 20ms grid
-  rawTime = Math.round(rawTime / 20) * 20;
+  rawTime = Math.round(rawTime / TIME_MULTIPLIER) * TIME_MULTIPLIER;
   // Clamp brightness
   rawBri = Math.round(Math.max(0, Math.min(100, rawBri)));
 
   // Clamp time: must stay between neighbors with at least 20ms gap
-  const minTime = (pointIndex > 1) ? points[pointIndex - 1].t + 20 : 20;
-  const maxPointTime = (pointIndex < points.length - 1) ? points[pointIndex + 1].t - 20 : maxTime;
+  const minTime = (pointIndex > 1) ? points[pointIndex - 1].t + TIME_MULTIPLIER : TIME_MULTIPLIER;
+  const maxPointTime = (pointIndex < points.length - 1) ? points[pointIndex + 1].t - TIME_MULTIPLIER : maxTime;
   rawTime = Math.max(minTime, Math.min(maxPointTime, rawTime));
 
   // Live update SVG positions without full re-render
@@ -564,7 +470,7 @@ function commitTimelineDrag() {
 
   // Update duration for this step: delta from previous point
   const prevTime = points[pointIndex - 1].t;
-  const newDuration = Math.max(0, Math.round((draggedPoint.t - prevTime) / 20));
+  const newDuration = Math.max(0, Math.min(255, Math.round((draggedPoint.t - prevTime) / TIME_MULTIPLIER)));
   const durHex = newDuration.toString(16).toUpperCase().padStart(2, '0');
   seq.data[stepIndex * 2] = durHex;
 
@@ -572,7 +478,7 @@ function commitTimelineDrag() {
   const nextStepIndex = stepIndex + 1;
   if (nextStepIndex < Math.floor(seq.data.length / 2) && pointIndex + 1 < points.length) {
     const nextPointTime = points[pointIndex + 1].t;
-    const nextDuration = Math.max(0, Math.round((nextPointTime - draggedPoint.t) / 20));
+    const nextDuration = Math.max(0, Math.min(255, Math.round((nextPointTime - draggedPoint.t) / TIME_MULTIPLIER)));
     const nextDurHex = nextDuration.toString(16).toUpperCase().padStart(2, '0');
     seq.data[nextStepIndex * 2] = nextDurHex;
   }
@@ -626,7 +532,7 @@ function handleTimelineKeydown(e, side, seqIndex, seq, inspector) {
 
   if (timeDelta !== 0) {
     // Duration change: adjust this step's duration in 20ms units
-    const durUnits = Math.round(timeDelta / 20);
+    const durUnits = Math.round(timeDelta / TIME_MULTIPLIER);
     const newDur = Math.max(0, Math.min(255, currentDurHex + durUnits));
     seq.data[stepIndex * 2] = newDur.toString(16).toUpperCase().padStart(2, '0');
   }
@@ -704,11 +610,11 @@ function updateInspector(inspector, side, seqIndex, seq, points, pointIndex) {
   durInput.min = '0';
   durInput.max = '5100';
   durInput.step = '20';
-  durInput.value = durHex * 20;
+  durInput.value = durHex * TIME_MULTIPLIER;
   durInput.className = 'tl-inspector-input';
   durInput.oninput = () => {
-    const ms = Math.max(0, Math.min(5100, parseInt(durInput.value) || 0));
-    const hexVal = Math.round(ms / 20);
+    const ms = Math.max(0, Math.min(5100, parseInt(durInput.value, 10) || 0));
+    const hexVal = Math.round(ms / TIME_MULTIPLIER);
     seq.data[stepIndex * 2] = hexVal.toString(16).toUpperCase().padStart(2, '0');
     seq.lengthVal = Math.floor(seq.data.length / 2);
     applySequenceEdit(side, seqIndex);
@@ -732,7 +638,7 @@ function updateInspector(inspector, side, seqIndex, seq, points, pointIndex) {
   briInput.value = briVal;
   briInput.className = 'tl-inspector-input';
   briInput.oninput = () => {
-    const bri = Math.max(0, Math.min(100, parseInt(briInput.value) || 0));
+    const bri = Math.max(0, Math.min(100, parseInt(briInput.value, 10) || 0));
     seq.data[stepIndex * 2 + 1] = bri.toString(16).toUpperCase().padStart(2, '0');
     seq.lengthVal = Math.floor(seq.data.length / 2);
     applySequenceEdit(side, seqIndex);
@@ -757,27 +663,3 @@ function updateInspector(inspector, side, seqIndex, seq, points, pointIndex) {
   inspector.appendChild(deleteBtn);
 }
 
-// SVG helper functions
-function appendSVGLine(group, x1, y1, x2, y2, stroke, strokeWidth) {
-  const line = document.createElementNS(SVG_NS, 'line');
-  line.setAttribute('x1', x1);
-  line.setAttribute('y1', y1);
-  line.setAttribute('x2', x2);
-  line.setAttribute('y2', y2);
-  line.setAttribute('stroke', stroke);
-  line.setAttribute('stroke-width', strokeWidth);
-  group.appendChild(line);
-  return line;
-}
-
-function appendSVGText(group, x, y, text, anchor, fontSize, fill) {
-  const el = document.createElementNS(SVG_NS, 'text');
-  el.setAttribute('x', x);
-  el.setAttribute('y', y);
-  el.setAttribute('text-anchor', anchor);
-  el.setAttribute('font-size', fontSize);
-  el.setAttribute('fill', fill);
-  el.textContent = text;
-  group.appendChild(el);
-  return el;
-}

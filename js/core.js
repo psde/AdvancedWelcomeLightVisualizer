@@ -1,11 +1,19 @@
 const MAX_STAGING1 = 252;
 const MAX_STAGING2 = 168;
 const RAW_IDENTIFIER = "RAW";
+// Real-world validation: 60fps recordings confirmed ×20 multiplier (BMW G20 2020)
+const TIME_MULTIPLIER = 20;
 
 const sideData = {
   left:  { staging1Bytes: [], staging2Bytes: [], sequences: [] },
   right: { staging1Bytes: [], staging2Bytes: [], sequences: [] }
 };
+
+function getActiveVehicleConfig() {
+  const vehicleSelect = document.getElementById("vehicleSelect");
+  if (!vehicleSelect) return null;
+  return VEHICLE_CONFIGS[vehicleSelect.value] || null;
+}
 
 function parseByteString(str) {
   if (!str) return [];
@@ -131,7 +139,7 @@ function getSequenceDuration(seq) {
   let totalTime = 0;
   for (let i = 0; i < seq.data.length; i += 2) {
     const durationHex = parseInt(seq.data[i], 16) || 0;
-    totalTime += durationHex * 20;
+    totalTime += durationHex * TIME_MULTIPLIER;
   }
   return totalTime;
 }
