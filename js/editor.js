@@ -331,8 +331,12 @@ function applySequenceEdit(side, seqIndex) {
     });
   }
 
-  updateSequenceChart(seqIndex);
-  updateSummaryCharts();
+  if (currentPhaseTimeline) {
+    rerenderAllCharts();
+  } else {
+    updateSequenceChart(seqIndex);
+    updateSummaryCharts();
+  }
   updateVisuals(currentAnimTime);
 }
 

@@ -460,7 +460,8 @@ function showFocusedStepOnChart(seqIndex, side, stepIndex) {
   const chart = chartInstances[seqIndex];
   if (!chart) return;
 
-  const { leftData, rightData, maxTime } = getChartData(seqIndex);
+  const { leftData, rightData } = getChartData(seqIndex);
+  const maxTime = chart.maxTime;
   const points = side === 'left' ? leftData.points : rightData.points;
   const pointIdx = stepIndex + 1; // points[0] is initial {t:0, b:0}
 
