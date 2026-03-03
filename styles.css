@@ -1,10 +1,82 @@
+:root {
+  --bg-body: #e0e0e0;
+  --bg-container: #fff;
+  --bg-seq-block: #f9f9f9;
+  --bg-editor: #f5f5f5;
+  --bg-info: #f0f0f0;
+  --bg-input: #fff;
+  --bg-summary: #faf6f1;
+  --bg-phase-bar: #f0e8e0;
+  --text-primary: #333;
+  --text-secondary: #555;
+  --text-muted: #666;
+  --text-phase: #5a3e28;
+  --border-light: #ccc;
+  --border-lighter: #e0e0e0;
+  --border-medium: #ddd;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --shadow-color-strong: rgba(0, 0, 0, 0.2);
+  --bg-toggle-inactive: #ddd;
+  --border-phase: #d4c4b0;
+  --insert-hover-bg: #e8f5e9;
+
+  /* SVG colors (read via getCSSColor) */
+  --svg-grid-border: #000;
+  --svg-grid-line: #ddd;
+  --svg-text: #333;
+  --svg-position: #333;
+  --svg-crosshair: #64646478;
+  --svg-ref-line: #999;
+  --svg-legend-bg: #ffffffd9;
+  --svg-legend-text: #555;
+  --svg-phase-boundary: #b46464;
+  --svg-handle-origin: #999;
+  --svg-handle-stroke: #fff;
+}
+
+body.dark-mode {
+  --bg-body: #1a1a2e;
+  --bg-container: #2a2a3e;
+  --bg-seq-block: #222236;
+  --bg-editor: #252540;
+  --bg-info: #2e2e48;
+  --bg-input: #252540;
+  --bg-summary: #28283c;
+  --bg-phase-bar: #2e2840;
+  --text-primary: #e0e0e0;
+  --text-secondary: #c0c0c0;
+  --text-muted: #a0a0b0;
+  --text-phase: #d4b896;
+  --border-light: #444;
+  --border-lighter: #3a3a50;
+  --border-medium: #3a3a50;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --shadow-color-strong: rgba(0, 0, 0, 0.5);
+  --bg-toggle-inactive: #3a3a50;
+  --border-phase: #5a4a3a;
+  --insert-hover-bg: #1a3a2a;
+
+  --svg-grid-border: #888;
+  --svg-grid-line: #3a3a50;
+  --svg-text: #c0c0c0;
+  --svg-position: #c0c0c0;
+  --svg-crosshair: #9090a078;
+  --svg-ref-line: #707080;
+  --svg-legend-bg: #2a2a3ed9;
+  --svg-legend-text: #c0c0c0;
+  --svg-phase-boundary: #c48080;
+  --svg-handle-origin: #707080;
+  --svg-handle-stroke: #2a2a3e;
+}
+
 body {
   font-family: Arial, sans-serif;
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 10px;
-  background-color: #e0e0e0;
+  background-color: var(--bg-body);
+  color: var(--text-primary);
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -19,10 +91,10 @@ body {
 }
 
 .group-container {
-  background-color: #fff;
+  background-color: var(--bg-container);
   border-radius: 4px;
   padding: 15px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px var(--shadow-color);
   width: 48%;
   box-sizing: border-box;
 }
@@ -48,9 +120,11 @@ label {
   padding: 4px;
   font-family: monospace;
   font-size: 12px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-light);
   border-radius: 3px;
   box-sizing: border-box;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
 }
 
 .copy-btn,
@@ -94,17 +168,17 @@ button {
   gap: 10px;
   margin-bottom: 15px;
   flex-wrap: wrap;
-  background-color: #f9f9f9;
+  background-color: var(--bg-seq-block);
   padding: 10px;
   border-radius: 4px;
 }
 
 .seq-subblock {
   flex: 1 1 45%;
-  background-color: #fff;
+  background-color: var(--bg-container);
   padding: 10px;
   border-radius: 4px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 2px var(--shadow-color);
 }
 
 .seq-subblock h4 {
@@ -132,6 +206,9 @@ button {
   font-size: 11px;
   box-sizing: border-box;
   margin-bottom: 0;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
 }
 
 .mini-copy-btn {
@@ -150,19 +227,19 @@ button {
 
 .chartCanvas {
   margin: 5px 0;
-  border: 1px solid #ccc;
-  background-color: #fff;
+  border: 1px solid var(--border-light);
+  background-color: var(--bg-container);
   width: 100%;
   flex-basis: 100%;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 2px var(--shadow-color);
   border-radius: 4px;
 }
 
 .animation-player {
-  background-color: #fff;
+  background-color: var(--bg-container);
   padding: 15px;
   border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px var(--shadow-color);
   width: 100%;
   box-sizing: border-box;
   margin: 15px 0;
@@ -177,7 +254,7 @@ button {
   top: 0;
   z-index: 1000;
   border-bottom: 4px solid #0056b3;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 8px var(--shadow-color-strong);
   padding: 5px 15px;
 }
 
@@ -311,9 +388,9 @@ input[type=range] {
   font-size: 12px;
   border-radius: 0;
   margin: 0;
-  background-color: #ddd;
-  color: #333;
-  border: 1px solid #ccc;
+  background-color: var(--bg-toggle-inactive);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
 }
 
 .editor-toggle button:first-child {
@@ -331,8 +408,8 @@ input[type=range] {
 }
 
 .visual-editor {
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
+  background-color: var(--bg-editor);
+  border: 1px solid var(--border-medium);
   border-radius: 4px;
   padding: 10px;
   max-height: 200px;
@@ -345,8 +422,8 @@ input[type=range] {
   align-items: center;
   gap: 8px;
   padding: 8px;
-  background-color: #fff;
-  border: 1px solid #e0e0e0;
+  background-color: var(--bg-container);
+  border: 1px solid var(--border-lighter);
   border-radius: 4px;
 }
 
@@ -359,7 +436,7 @@ input[type=range] {
 .step-label {
   font-weight: bold;
   font-size: 12px;
-  color: #555;
+  color: var(--text-secondary);
   white-space: nowrap;
   margin-right: 2px;
 }
@@ -392,7 +469,7 @@ input[type=range] {
 
 .step-field label {
   font-size: 11px;
-  color: #666;
+  color: var(--text-muted);
   margin: 0;
   min-width: 55px;
 }
@@ -414,9 +491,11 @@ input[type=range] {
   padding: 2px 4px;
   font-size: 11px;
   font-family: monospace;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-light);
   border-radius: 3px;
   text-align: right;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
 }
 
 .step-field input[type="number"]:focus {
@@ -441,8 +520,8 @@ input[type=range] {
 
 .insert-step-btn {
   background: transparent;
-  border: 1px dashed #e0e0e0;
-  color: #ccc;
+  border: 1px dashed var(--border-lighter);
+  color: var(--border-light);
   padding: 0;
   margin: 0;
   width: 100%;
@@ -455,7 +534,7 @@ input[type=range] {
 }
 
 .insert-step-btn:hover {
-  background-color: #e8f5e9;
+  background-color: var(--insert-hover-bg);
   border-color: #28a745;
   color: #28a745;
 }
@@ -464,17 +543,17 @@ input[type=range] {
 .hex-info-line {
   font-size: 11px;
   font-family: monospace;
-  color: #666;
+  color: var(--text-muted);
   padding: 4px 6px;
-  background: #f0f0f0;
-  border: 1px solid #ddd;
+  background: var(--bg-info);
+  border: 1px solid var(--border-medium);
   border-radius: 3px;
   margin-bottom: 4px;
 }
 
 /* RAW data message in visual mode */
 .raw-data-msg {
-  color: #999;
+  color: var(--text-muted);
   font-size: 12px;
   margin: 0;
 }
@@ -503,35 +582,35 @@ textarea.overflow-error {
 .byte-counter-info {
   font-size: 11px;
   font-weight: bold;
-  color: #333;
-  background: #eee;
+  color: var(--text-primary);
+  background: var(--bg-info);
   padding: 1px 4px;
   border-radius: 3px;
   margin-left: 10px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-light);
 }
 
 .phase-timing-bar {
-  background: #f0e8e0;
-  border: 1px solid #d4c4b0;
+  background: var(--bg-phase-bar);
+  border: 1px solid var(--border-phase);
   border-radius: 4px;
   padding: 8px 12px;
   margin-bottom: 15px;
   font-size: 12px;
   font-family: monospace;
-  color: #5a3e28;
+  color: var(--text-phase);
 }
 
 .summary-charts-section {
-  border: 2px solid #d4c4b0;
+  border: 2px solid var(--border-phase);
   border-radius: 6px;
   padding: 10px;
   margin-bottom: 20px;
-  background: #faf6f1;
+  background: var(--bg-summary);
 }
 
 .summary-charts-section h3 {
-  color: #5a3e28;
+  color: var(--text-phase);
   font-size: 14px;
 }
 
@@ -577,6 +656,9 @@ textarea.overflow-error {
   height: 60px;
   font-family: monospace;
   font-size: 11px;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
 }
 
 .sticky-toggle-label {
@@ -587,14 +669,18 @@ textarea.overflow-error {
   cursor: pointer;
 }
 
+.sticky-toggle-label + .sticky-toggle-label {
+  margin-left: 0;
+}
+
 .summary-header {
   margin: 10px 0 5px;
 }
 
 /* Timeline Editor */
 .timeline-wrapper {
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
+  background-color: var(--bg-editor);
+  border: 1px solid var(--border-medium);
   border-radius: 4px;
   padding: 8px;
 }
@@ -604,7 +690,7 @@ textarea.overflow-error {
   width: 100%;
   cursor: default;
   outline: none;
-  background-color: #fff;
+  background-color: var(--bg-container);
   border-radius: 3px;
 }
 
@@ -653,8 +739,8 @@ textarea.overflow-error {
   gap: 12px;
   padding: 8px 10px;
   margin-top: 6px;
-  background-color: #fff;
-  border: 1px solid #ddd;
+  background-color: var(--bg-container);
+  border: 1px solid var(--border-medium);
   border-radius: 4px;
   font-size: 12px;
   flex-wrap: wrap;
@@ -662,14 +748,14 @@ textarea.overflow-error {
 
 .tl-inspector-label {
   font-weight: bold;
-  color: #555;
+  color: var(--text-secondary);
 }
 
 .tl-inspector-field {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #666;
+  color: var(--text-muted);
   font-size: 12px;
   margin: 0;
 }
@@ -679,9 +765,11 @@ textarea.overflow-error {
   padding: 2px 4px;
   font-size: 11px;
   font-family: monospace;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-light);
   border-radius: 3px;
   text-align: right;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
 }
 
 .tl-inspector-input:focus {
@@ -779,7 +867,7 @@ textarea.overflow-error {
   width: 100%;
   cursor: default;
   outline: none;
-  background-color: #fff;
+  background-color: var(--bg-container);
 }
 
 .chart-svg.tl-dragging {
@@ -787,7 +875,7 @@ textarea.overflow-error {
 }
 
 .summary-chart-svg {
-  background-color: #faf6f1;
+  background-color: var(--bg-summary);
 }
 
 .chart-fill-area {
@@ -824,4 +912,18 @@ textarea.overflow-error {
 
 .chart-inspector {
   margin-top: 6px;
+}
+
+/* Dark mode overrides for native form elements */
+body.dark-mode select,
+body.dark-mode input[type="text"],
+body.dark-mode input[type="number"],
+body.dark-mode textarea {
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+
+body.dark-mode textarea.overflow-error {
+  background-color: #3a1a1a !important;
 }

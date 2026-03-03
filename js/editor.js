@@ -1,6 +1,25 @@
 const editModes = { left: {}, right: {} };
 let focusedStep = null;
 
+function rerenderAllCharts() {
+  for (const chart of chartInstances) {
+    const svgWidth = chart.svg.getBoundingClientRect().width || chart.lastRenderedWidth;
+    if (svgWidth > 0) renderSequenceChartContent(chart, svgWidth);
+  }
+  for (const chart of summaryChartInstances) {
+    const svgWidth = chart.svg.getBoundingClientRect().width || chart.lastRenderedWidth;
+    if (svgWidth > 0) renderSummaryChartContent(chart, svgWidth);
+  }
+  // Re-render active timeline editors
+  for (const side of ['left', 'right']) {
+    for (const seqIndex of Object.keys(editModes[side])) {
+      if (editModes[side][seqIndex] === 'timeline') {
+        renderSequenceEditor(side, parseInt(seqIndex, 10));
+      }
+    }
+  }
+}
+
 function formatStepTime(ms) {
   if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;
   return `${ms}ms`;
@@ -436,6 +455,24 @@ function renderDynamicSequences() {
     stickyLabel.appendChild(stickyInput);
     stickyLabel.appendChild(document.createTextNode("Sticky Player"));
     controlsDiv.appendChild(stickyLabel);
+
+    // Dark mode toggle
+    const darkLabel = document.createElement("label");
+    darkLabel.className = "sticky-toggle-label";
+
+    const darkInput = document.createElement("input");
+    darkInput.type = "checkbox";
+    darkInput.id = "darkModeToggle";
+    darkInput.checked = document.body.classList.contains("dark-mode");
+    darkInput.onchange = (e) => {
+      document.body.classList.toggle("dark-mode", e.target.checked);
+      localStorage.setItem("darkMode", e.target.checked);
+      rerenderAllCharts();
+    };
+
+    darkLabel.appendChild(darkInput);
+    darkLabel.appendChild(document.createTextNode("Dark Mode"));
+    controlsDiv.appendChild(darkLabel);
   }
 
   // Rebuild dynamic content

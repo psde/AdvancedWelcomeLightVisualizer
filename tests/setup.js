@@ -75,6 +75,16 @@ globalThis.document = {
   querySelectorAll: function() { return []; }
 };
 globalThis.navigator = { clipboard: {} };
+globalThis.localStorage = {
+  _store: {},
+  getItem: function(key) { return this._store[key] !== undefined ? this._store[key] : null; },
+  setItem: function(key, value) { this._store[key] = String(value); },
+  removeItem: function(key) { delete this._store[key]; },
+  clear: function() { this._store = {}; }
+};
+globalThis.getComputedStyle = function() {
+  return { getPropertyValue: function() { return ''; } };
+};
 globalThis.requestAnimationFrame = function() {};
 globalThis.cancelAnimationFrame = function() {};
 globalThis.ResizeObserver = class { observe() {} disconnect() {} };

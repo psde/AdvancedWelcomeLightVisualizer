@@ -9,6 +9,10 @@ const COLOR_IDENTICAL = '#00b400';
 
 const TL_COLORS = { left: SIDE_COLOR_LEFT, right: SIDE_COLOR_RIGHT };
 
+function getCSSColor(varName) {
+  return getComputedStyle(document.body).getPropertyValue(varName).trim() || varName;
+}
+
 function getSideColor(side) {
   return TL_COLORS[side] || TL_COLORS.left;
 }
@@ -112,14 +116,14 @@ function drawHandle(group, point, index, side, seqIndex, maxTime, plotWidth, plo
 
   if (index === 0) {
     circle.setAttribute('r', '4');
-    circle.setAttribute('fill', '#999');
-    circle.setAttribute('stroke', '#fff');
+    circle.setAttribute('fill', getCSSColor('--svg-handle-origin'));
+    circle.setAttribute('stroke', getCSSColor('--svg-handle-stroke'));
     circle.setAttribute('stroke-width', '1');
     circle.classList.add('tl-origin');
   } else {
     circle.setAttribute('r', TL_HANDLE_RADIUS);
     circle.setAttribute('fill', color);
-    circle.setAttribute('stroke', '#fff');
+    circle.setAttribute('stroke', getCSSColor('--svg-handle-stroke'));
     circle.setAttribute('stroke-width', '2');
     circle.classList.add('tl-handle');
   }
