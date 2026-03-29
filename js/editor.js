@@ -289,7 +289,8 @@ function insertStepAfter(side, seqIndex, afterStepIndex) {
   if (!seq || seq.identifier === RAW_IDENTIFIER) return;
 
   const insertPos = (afterStepIndex + 1) * 2;
-  seq.data.splice(insertPos, 0, '0A', '00');
+  const previousBrightness = afterStepIndex >= 0 ? (seq.data[afterStepIndex * 2 + 1] || '00') : '00';
+  seq.data.splice(insertPos, 0, '0A', previousBrightness);
   seq.lengthVal = Math.floor(seq.data.length / 2);
 
   applySequenceEdit(side, seqIndex);
@@ -374,7 +375,8 @@ function addStep(side, seqIndex) {
   const seq = sideData[side].sequences[seqIndex];
   if (!seq || seq.identifier === RAW_IDENTIFIER) return;
 
-  seq.data.push('0A', '00');
+  const previousBrightness = seq.data.length >= 2 ? seq.data[seq.data.length - 1] : '00';
+  seq.data.push('0A', previousBrightness);
   seq.lengthVal = Math.floor(seq.data.length / 2);
 
   applySequenceEdit(side, seqIndex);
