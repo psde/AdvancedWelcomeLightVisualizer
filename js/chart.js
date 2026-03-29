@@ -321,10 +321,11 @@ function renderSequenceChartContent(state, svgWidth) {
   drawOverlayCurves(state.curveGroup, leftData.points, rightData.points, maxTime, plotWidth, plotHeight);
 
   // Position indicator (created once, updated per frame)
-  state.positionLine = appendSVGLine(state.positionGroup, 0, TL_MARGIN, 0, TL_MARGIN + plotHeight, '#333', 2);
+  const posColor = getCSSColor('--svg-position');
+  state.positionLine = appendSVGLine(state.positionGroup, 0, TL_MARGIN, 0, TL_MARGIN + plotHeight, posColor, 2);
   state.positionLine.style.display = 'none';
   state.positionTriangle = document.createElementNS(SVG_NS, 'polygon');
-  state.positionTriangle.setAttribute('fill', '#333');
+  state.positionTriangle.setAttribute('fill', posColor);
   state.positionTriangle.style.display = 'none';
   state.positionGroup.appendChild(state.positionTriangle);
 
@@ -395,20 +396,20 @@ function drawSVGPhaseBoundaries(group, plotWidth, plotHeight, maxTime) {
       if (boundary <= 0 || boundary >= maxTime) continue;
 
       const x = timeToX(boundary, maxTime, plotWidth);
-      const line = appendSVGLine(group, x, TL_MARGIN, x, TL_MARGIN + plotHeight, '#b46464', 1);
+      const line = appendSVGLine(group, x, TL_MARGIN, x, TL_MARGIN + plotHeight, getCSSColor('--svg-phase-boundary'), 1);
       line.setAttribute('stroke-dasharray', '5,5');
       line.classList.add('chart-phase-line');
     }
 
     const midX = timeToX((phase.start + phase.end) / 2, maxTime, plotWidth);
-    const label = appendSVGText(group, midX, TL_MARGIN - 4, phase.name, 'middle', '9px', '#b46464');
+    const label = appendSVGText(group, midX, TL_MARGIN - 4, phase.name, 'middle', '9px', getCSSColor('--svg-phase-boundary'));
     label.classList.add('chart-phase-label');
   }
 }
 
 function drawSVGDefaultBrightnessLine(group, plotWidth, plotHeight, brightness) {
   const y = brightnessToY(brightness, plotHeight);
-  const line = appendSVGLine(group, TL_MARGIN, y, TL_MARGIN + plotWidth, y, '#999', 1);
+  const line = appendSVGLine(group, TL_MARGIN, y, TL_MARGIN + plotWidth, y, getCSSColor('--svg-ref-line'), 1);
   line.setAttribute('stroke-dasharray', '3,3');
   line.classList.add('chart-ref-line');
 }
@@ -459,7 +460,8 @@ function showFocusedStepOnChart(seqIndex, side, stepIndex) {
   const chart = chartInstances[seqIndex];
   if (!chart) return;
 
-  const { leftData, rightData, maxTime } = getChartData(seqIndex);
+  const { leftData, rightData } = getChartData(seqIndex);
+  const maxTime = chart.maxTime;
   const points = side === 'left' ? leftData.points : rightData.points;
   const pointIdx = stepIndex + 1; // points[0] is initial {t:0, b:0}
 
@@ -485,9 +487,10 @@ function showFocusedStepOnChart(seqIndex, side, stepIndex) {
   appendSVGLine(group, x1, y1, x2, y2, sideColor, 4);
 
   // Crosshair dashed lines from end point to axes
-  const hLine = appendSVGLine(group, x2, TL_MARGIN + plotHeight, x2, y2, '#64646478', 1);
+  const crosshairColor = getCSSColor('--svg-crosshair');
+  const hLine = appendSVGLine(group, x2, TL_MARGIN + plotHeight, x2, y2, crosshairColor, 1);
   hLine.setAttribute('stroke-dasharray', '3,3');
-  const vLine = appendSVGLine(group, TL_MARGIN, y2, x2, y2, '#64646478', 1);
+  const vLine = appendSVGLine(group, TL_MARGIN, y2, x2, y2, crosshairColor, 1);
   vLine.setAttribute('stroke-dasharray', '3,3');
 
   // Dot at end point
@@ -502,7 +505,7 @@ function showFocusedStepOnChart(seqIndex, side, stepIndex) {
 
   // Value label
   const timeLabel = formatStepTime(pEnd.t);
-  appendSVGText(group, x2 + 8, y2 - 6, `${timeLabel}, ${pEnd.b}%`, 'start', '10px', '#333');
+  appendSVGText(group, x2 + 8, y2 - 6, `${timeLabel}, ${pEnd.b}%`, 'start', '10px', getCSSColor('--svg-text'));
 }
 
 function clearFocusedStepOnChart(seqIndex) {
@@ -550,7 +553,7 @@ function updateSequenceChart(seqIndex) {
   const chart = chartInstances[seqIndex];
   if (!chart) return;
 
-  const svgWidth = chart.svg.getBoundingClientRect().width;
+  const svgWidth = chart.svg.getBoundingClientRect().width || chart.lastRenderedWidth;
   if (svgWidth > 0) {
     renderSequenceChartContent(chart, svgWidth);
   }
@@ -558,7 +561,7 @@ function updateSequenceChart(seqIndex) {
 
 function updateSummaryCharts() {
   for (const chart of summaryChartInstances) {
-    const svgWidth = chart.svg.getBoundingClientRect().width;
+    const svgWidth = chart.svg.getBoundingClientRect().width || chart.lastRenderedWidth;
     if (svgWidth > 0) {
       renderSummaryChartContent(chart, svgWidth);
     }
@@ -734,7 +737,7 @@ function renderSummaryChartContent(state, svgWidth) {
     if (defaultBrightness > 0) {
       drawSVGDefaultBrightnessLine(state.refLineGroup, plotWidth, plotHeight, defaultBrightness);
       const labelY = brightnessToY(defaultBrightness, plotHeight);
-      appendSVGText(state.refLineGroup, TL_MARGIN + 3, labelY - 3, `Default: ${defaultBrightness}%`, 'start', '9px', '#999');
+      appendSVGText(state.refLineGroup, TL_MARGIN + 3, labelY - 3, `Default: ${defaultBrightness}%`, 'start', '9px', getCSSColor('--svg-ref-line'));
     }
   }
 
@@ -748,10 +751,11 @@ function renderSummaryChartContent(state, svgWidth) {
   }
 
   // Position indicator
-  state.positionLine = appendSVGLine(state.positionGroup, 0, TL_MARGIN, 0, TL_MARGIN + plotHeight, '#333', 2);
+  const summaryPosColor = getCSSColor('--svg-position');
+  state.positionLine = appendSVGLine(state.positionGroup, 0, TL_MARGIN, 0, TL_MARGIN + plotHeight, summaryPosColor, 2);
   state.positionLine.style.display = 'none';
   state.positionTriangle = document.createElementNS(SVG_NS, 'polygon');
-  state.positionTriangle.setAttribute('fill', '#333');
+  state.positionTriangle.setAttribute('fill', summaryPosColor);
   state.positionTriangle.style.display = 'none';
   state.positionGroup.appendChild(state.positionTriangle);
 
@@ -849,7 +853,7 @@ function drawSVGPerLightBoundaries(group, plotWidth, plotHeight, maxTime, physic
 
   if (boundaries.length === 0) return;
 
-  const boundaryColor = '#b46464';
+  const boundaryColor = getCSSColor('--svg-phase-boundary');
 
   // Boundary lines
   const linePoints = new Set();
@@ -901,18 +905,18 @@ function drawSummaryLegend(group, plotWidth, plotHeight) {
   bg.setAttribute('width', 110);
   bg.setAttribute('height', 18);
   bg.setAttribute('rx', 3);
-  bg.setAttribute('fill', '#ffffffd9');
+  bg.setAttribute('fill', getCSSColor('--svg-legend-bg'));
   bg.setAttribute('stroke', 'none');
   group.appendChild(bg);
 
   // Solid line + "Channel" label
   appendSVGLine(group, lx, ly + 7, lx + 16, ly + 7, COLOR_IDENTICAL, 2);
-  appendSVGText(group, lx + 19, ly + 10, 'Channel', 'start', '8px', '#555');
+  appendSVGText(group, lx + 19, ly + 10, 'Channel', 'start', '8px', getCSSColor('--svg-legend-text'));
 
   // Dashed line + "Default" label
   const dashLine = appendSVGLine(group, lx + 58, ly + 7, lx + 74, ly + 7, COLOR_IDENTICAL, 2);
   dashLine.setAttribute('stroke-dasharray', '6,4');
-  appendSVGText(group, lx + 77, ly + 10, 'Default', 'start', '8px', '#555');
+  appendSVGText(group, lx + 77, ly + 10, 'Default', 'start', '8px', getCSSColor('--svg-legend-text'));
 }
 
 // ============================================================================

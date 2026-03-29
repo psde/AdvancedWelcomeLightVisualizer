@@ -73,14 +73,14 @@ describe('copySequence', () => {
 describe('addStep', () => {
   beforeEach(() => resetGlobalState());
 
-  it('should append a step with default values (0A, 00)', () => {
+  it('should append a step inheriting brightness from previous step', () => {
     sideData.left.sequences[0] = { identifier: '01', lengthVal: 1, data: ['0A', '64'] };
     addStep('left', 0);
 
     const seq = sideData.left.sequences[0];
     assert.strictEqual(seq.data.length, 4);
     assert.strictEqual(seq.data[2], '0A');
-    assert.strictEqual(seq.data[3], '00');
+    assert.strictEqual(seq.data[3], '64');
     assert.strictEqual(seq.lengthVal, 2);
   });
 
@@ -177,7 +177,7 @@ describe('insertStepAfter', () => {
     const seq = sideData.left.sequences[0];
     assert.strictEqual(seq.data.length, 6);
     assert.strictEqual(seq.data[2], '0A');
-    assert.strictEqual(seq.data[3], '00');
+    assert.strictEqual(seq.data[3], '64');
     assert.strictEqual(seq.lengthVal, 3);
   });
 

@@ -128,11 +128,15 @@ function renderSVGContent(state, svgWidth, inspector) {
 }
 
 function drawTimelineGrid(group, plotWidth, plotHeight, maxTime) {
+  const borderColor = getCSSColor('--svg-grid-border');
+  const gridColor = getCSSColor('--svg-grid-line');
+  const textColor = getCSSColor('--svg-text');
+
   // Plot area border
-  appendSVGLine(group, TL_MARGIN, TL_MARGIN, TL_MARGIN + plotWidth, TL_MARGIN, '#000', 1);
-  appendSVGLine(group, TL_MARGIN, TL_MARGIN + plotHeight, TL_MARGIN + plotWidth, TL_MARGIN + plotHeight, '#000', 1);
-  appendSVGLine(group, TL_MARGIN, TL_MARGIN, TL_MARGIN, TL_MARGIN + plotHeight, '#000', 1);
-  appendSVGLine(group, TL_MARGIN + plotWidth, TL_MARGIN, TL_MARGIN + plotWidth, TL_MARGIN + plotHeight, '#000', 1);
+  appendSVGLine(group, TL_MARGIN, TL_MARGIN, TL_MARGIN + plotWidth, TL_MARGIN, borderColor, 1);
+  appendSVGLine(group, TL_MARGIN, TL_MARGIN + plotHeight, TL_MARGIN + plotWidth, TL_MARGIN + plotHeight, borderColor, 1);
+  appendSVGLine(group, TL_MARGIN, TL_MARGIN, TL_MARGIN, TL_MARGIN + plotHeight, borderColor, 1);
+  appendSVGLine(group, TL_MARGIN + plotWidth, TL_MARGIN, TL_MARGIN + plotWidth, TL_MARGIN + plotHeight, borderColor, 1);
 
   const { grid: gridStep, label: labelStep } = getGridStepX(maxTime);
 
@@ -140,27 +144,27 @@ function drawTimelineGrid(group, plotWidth, plotHeight, maxTime) {
   for (let t = 0; t <= maxTime; t += gridStep) {
     const x = timeToX(t, maxTime, plotWidth);
     if (x > TL_MARGIN + plotWidth + 0.5) break;
-    appendSVGLine(group, x, TL_MARGIN, x, TL_MARGIN + plotHeight, '#ddd', 1);
+    appendSVGLine(group, x, TL_MARGIN, x, TL_MARGIN + plotHeight, gridColor, 1);
     if (t % labelStep === 0) {
-      appendSVGText(group, x, TL_MARGIN + plotHeight + 14, `${t}`, 'middle', '10px', '#333');
+      appendSVGText(group, x, TL_MARGIN + plotHeight + 14, `${t}`, 'middle', '10px', textColor);
     }
   }
 
   // Y-axis grid lines and labels
   for (let b = 0; b <= 100; b += 10) {
     const y = brightnessToY(b, plotHeight);
-    appendSVGLine(group, TL_MARGIN, y, TL_MARGIN + plotWidth, y, '#ddd', 1);
-    appendSVGText(group, TL_MARGIN - 5, y + 3, `${b}`, 'end', '10px', '#333');
+    appendSVGLine(group, TL_MARGIN, y, TL_MARGIN + plotWidth, y, gridColor, 1);
+    appendSVGText(group, TL_MARGIN - 5, y + 3, `${b}`, 'end', '10px', textColor);
   }
 
   // Axis labels
-  appendSVGText(group, TL_MARGIN + plotWidth / 2, TL_MARGIN + plotHeight + 30, 'Time (ms)', 'middle', '11px', '#333');
+  appendSVGText(group, TL_MARGIN + plotWidth / 2, TL_MARGIN + plotHeight + 30, 'Time (ms)', 'middle', '11px', textColor);
   const yLabel = document.createElementNS(SVG_NS, 'text');
   yLabel.setAttribute('x', TL_MARGIN - 30);
   yLabel.setAttribute('y', TL_MARGIN + plotHeight / 2);
   yLabel.setAttribute('text-anchor', 'middle');
   yLabel.setAttribute('font-size', '11px');
-  yLabel.setAttribute('fill', '#333');
+  yLabel.setAttribute('fill', textColor);
   yLabel.setAttribute('transform', `rotate(-90, ${TL_MARGIN - 30}, ${TL_MARGIN + plotHeight / 2})`);
   yLabel.textContent = 'Brightness (%)';
   group.appendChild(yLabel);
